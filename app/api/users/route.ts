@@ -7,6 +7,26 @@ import dbConnect from "@/lib/db";
 import { isOrganizationAdmin, isUserRole } from "@/lib/roles";
 import User from "@/models/User";
 
+function parseCustomFields(value: unknown) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 25) {
+    throw new TypeError("Add no more than 25 customer fields.");
+  }
+  const fields = value.map((field) => {
+    if (!field || typeof field !== "object" || Array.isArray(field)) {
+      throw new TypeError("Each customer field needs a name and value.");
+    }
+    const item = field as Record<string, unknown>;
+    return {
+      label: stringField(item.label, "Field name", 60),
+      value: stringField(item.value, "Field value", 500),
+    };
+  });
+  const labels = fields.map((field) => field.label.toLowerCase());
+  if (new Set(labels).size !== labels.length) throw new TypeError("Customer field names must be unique.");
+  return fields;
+}
+
 export async function GET() {
   const { actor, response } = await requireApiActor();
   if (response) return response;
@@ -14,13 +34,13 @@ export async function GET() {
   await dbConnect();
   if (actor.role === "user") {
     const ownAccount = await User.findById(actor.id)
-      .select("_id name email role assignedTo isActive phone kycStatus createdAt")
+      .select("_id name email role assignedTo isActive phone address customFields kycStatus createdAt")
       .lean();
     return Response.json({ users: ownAccount ? [ownAccount] : [] });
   }
   const filter = isOrganizationAdmin(actor.role) ? {} : { assignedTo: actor.id, role: "user" };
   const users = await User.find(filter)
-    .select("_id name email role assignedTo isActive phone kycStatus createdAt")
+    .select("_id name email role assignedTo isActive phone address customFields kycStatus createdAt")
     .populate("assignedTo", "name")
     .sort({ createdAt: -1 })
     .lean();
@@ -41,6 +61,7 @@ export async function POST(request: Request) {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new TypeError("Enter a valid email address.");
     const password = stringField(value.password, "Password", 128);
     if (password.length < 12) throw new TypeError("Password must contain at least 12 characters.");
+    const customFields = parseCustomFields(value.customFields);
     const requestedRole = value.role ?? "user";
     if (!isUserRole(requestedRole)) throw new TypeError("Role is not supported.");
     if (!isOrganizationAdmin(actor.role) && requestedRole !== "user") {
@@ -73,6 +94,8 @@ export async function POST(request: Request) {
           role: requestedRole,
           assignedTo,
           phone: typeof value.phone === "string" ? value.phone.trim().slice(0, 24) : undefined,
+          address: typeof value.address === "string" ? value.address.trim().slice(0, 500) : undefined,
+          customFields,
         }], { session });
         createdId = created._id.toString();
         await recordAudit({

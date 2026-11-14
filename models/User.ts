@@ -10,10 +10,16 @@ export interface IUser extends Document {
   isActive: boolean;
   phone?: string;
   address?: string;
+  customFields: { label: string; value: string }[];
   kycStatus: "NOT_STARTED" | "PENDING" | "VERIFIED" | "REJECTED";
   creditConsentAt?: Date;
   createdAt: Date;
 }
+
+const CustomerFieldSchema = new Schema({
+  label: { type: String, required: true, trim: true, maxlength: 60 },
+  value: { type: String, required: true, trim: true, maxlength: 500 },
+}, { _id: false });
 
 const UserSchema = new Schema<IUser>({
   name: { type: String, required: true, trim: true, maxlength: 120 },
@@ -24,6 +30,7 @@ const UserSchema = new Schema<IUser>({
   isActive: { type: Boolean, default: true },
   phone: { type: String, trim: true, maxlength: 24 },
   address: { type: String, trim: true, maxlength: 500 },
+  customFields: { type: [CustomerFieldSchema], default: [] },
   kycStatus: {
     type: String,
     enum: ["NOT_STARTED", "PENDING", "VERIFIED", "REJECTED"],

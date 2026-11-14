@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle, Plus, Search, UserRoundPlus } from "lucide-react";
+import { Eye, LoaderCircle, Pencil, Plus, Search, Trash2, UserRoundPlus, X } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import InlineMessage from "@/components/inline-message";
 import { useResource } from "@/components/use-resource";
@@ -14,14 +14,20 @@ type UserRow = {
   assignedTo?: { _id: string; name: string } | string | null;
   isActive: boolean;
   phone?: string;
+  address?: string;
+  customFields?: { label: string; value: string }[];
   kycStatus: string;
   createdAt: string;
 };
 
-async function request(url: string, method: string, body: Record<string, unknown>) {
-  const response = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+async function request(url: string, method: string, body?: Record<string, unknown>) {
+  const response = await fetch(url, {
+    method,
+    ...(body ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {}),
+  });
   const result = await response.json() as { error?: string };
   if (!response.ok) throw new Error(result.error ?? "The request could not be completed.");
+  return result;
 }
 
 export default function CustomersView({ role, teamMode = false }: { role: UserRole; teamMode?: boolean }) {
@@ -33,6 +39,12 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
   const [kycBusyId, setKycBusyId] = useState("");
   const [feedback, setFeedback] = useState("");
   const [failure, setFailure] = useState("");
+  const [selectedCustomer, setSelectedCustomer] = useState<UserRow | null>(null);
+  const [editingCustomer, setEditingCustomer] = useState(false);
+  const [fieldDrafts, setFieldDrafts] = useState<{ label: string; value: string }[]>([]);
+  const [detailBusy, setDetailBusy] = useState(false);
+  const [detailFailure, setDetailFailure] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const managers = (data?.users ?? []).filter((user) => user.role === "privileged" && user.isActive);
   const rows = useMemo(() => (data?.users ?? []).filter((user) => {
@@ -98,6 +110,73 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
     }
   }
 
+  async function openCustomer(user: UserRow, edit = false, confirmRemoval = false) {
+    setSelectedCustomer(user);
+    setEditingCustomer(edit);
+    setFieldDrafts(user.customFields?.map((field) => ({ ...field })) ?? []);
+    setDetailBusy(true);
+    setDetailFailure("");
+    setConfirmDelete(confirmRemoval);
+    try {
+      const result = await request(`/api/users/${user._id}`, "GET") as { customer: UserRow };
+      setSelectedCustomer(result.customer);
+      setFieldDrafts(result.customer.customFields?.map((field) => ({ ...field })) ?? []);
+    } catch (caught) {
+      setDetailFailure(caught instanceof Error ? caught.message : "Customer details could not be loaded.");
+    } finally {
+      setDetailBusy(false);
+    }
+  }
+
+  async function saveCustomer(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedCustomer) return;
+    const values = new FormData(event.currentTarget);
+    const customFields = fieldDrafts
+      .map((field) => ({ label: field.label.trim(), value: field.value.trim() }))
+      .filter((field) => field.label || field.value);
+    if (customFields.some((field) => !field.label || !field.value)) {
+      setDetailFailure("Complete or remove each additional field.");
+      return;
+    }
+
+    setDetailBusy(true);
+    setDetailFailure("");
+    try {
+      await request(`/api/users/${selectedCustomer._id}`, "PATCH", {
+        name: values.get("name"),
+        email: values.get("email"),
+        phone: values.get("phone"),
+        address: values.get("address"),
+        customFields,
+      });
+      setFeedback(`${selectedCustomer.name}'s details were updated.`);
+      setSelectedCustomer(null);
+      await reload();
+    } catch (caught) {
+      setDetailFailure(caught instanceof Error ? caught.message : "Customer details could not be updated.");
+    } finally {
+      setDetailBusy(false);
+    }
+  }
+
+  async function deleteCustomer() {
+    if (!selectedCustomer) return;
+    setDetailBusy(true);
+    setDetailFailure("");
+    try {
+      await request(`/api/users/${selectedCustomer._id}`, "DELETE");
+      setFeedback(`${selectedCustomer.name} was deleted.`);
+      setSelectedCustomer(null);
+      setConfirmDelete(false);
+      await reload();
+    } catch (caught) {
+      setDetailFailure(caught instanceof Error ? caught.message : "Customer could not be deleted.");
+    } finally {
+      setDetailBusy(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-2xl border border-[#dfe9e2] bg-white">
@@ -142,7 +221,7 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
             : rows.length === 0 ? <p className="px-5 py-12 text-center text-sm text-[#87958e]">No accounts found. Add an account to get started.</p>
               : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[700px] text-left">
+                  <table className="w-full min-w-[780px] text-left">
                     <thead className="bg-[#f8faf8] text-[10px] font-semibold uppercase tracking-[0.11em] text-[#87968e]"><tr><th className="px-5 py-3">Account</th><th className="px-5 py-3">Role</th><th className="px-5 py-3">Assigned to</th><th className="px-5 py-3">KYC review</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Action</th></tr></thead>
                     <tbody className="divide-y divide-[#f0f3f0]">
                       {rows.map((user) => (
@@ -152,7 +231,14 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
                           <td className="px-5 py-4 text-xs text-[#74867d]">{typeof user.assignedTo === "object" && user.assignedTo ? user.assignedTo.name : "—"}</td>
                           <td className="px-5 py-4"><select aria-label={`KYC review status for ${user.name}`} className="rounded-lg border border-[#e4ebe6] bg-white px-2 py-1.5 text-[10px] text-[#60776c] outline-none focus:border-[#6b9a7c]" disabled={kycBusyId === user._id} onChange={(event) => updateKycStatus(user, event.target.value)} value={user.kycStatus}><option value="NOT_STARTED">Not started</option><option value="PENDING">Pending</option><option value="VERIFIED">Verified</option><option value="REJECTED">Rejected</option></select></td>
                           <td className="px-5 py-4"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${user.isActive ? "bg-[#eaf4ed] text-[#397253]" : "bg-[#f2e9e7] text-[#9f5f52]"}`}>{user.isActive ? "Active" : "Inactive"}</span></td>
-                          <td className="px-5 py-4"><button className="text-xs font-semibold text-[#668272] hover:text-[#274c38] disabled:opacity-50" disabled={busyId === user._id} onClick={() => toggleActive(user)} type="button">{busyId === user._id ? "Saving…" : user.isActive ? "Deactivate" : "Reactivate"}</button></td>
+                          <td className="px-5 py-4"><div className="flex items-center gap-1">
+                            {user.role === "user" && !teamMode && <>
+                              <button aria-label={`View ${user.name}`} className="grid size-8 place-items-center rounded-md text-[#668272] hover:bg-[#f1f6f2] hover:text-[#274c38]" onClick={() => openCustomer(user)} title="View customer" type="button"><Eye className="size-4" /></button>
+                              <button aria-label={`Edit ${user.name}`} className="grid size-8 place-items-center rounded-md text-[#668272] hover:bg-[#f1f6f2] hover:text-[#274c38]" onClick={() => openCustomer(user, true)} title="Edit customer" type="button"><Pencil className="size-4" /></button>
+                              <button aria-label={`Delete ${user.name}`} className="grid size-8 place-items-center rounded-md text-[#a34343] hover:bg-[#fbefed]" onClick={() => { void openCustomer(user, false, true); }} title="Delete customer" type="button"><Trash2 className="size-4" /></button>
+                            </>}
+                            <button className="ml-1 text-xs font-semibold text-[#668272] hover:text-[#274c38] disabled:opacity-50" disabled={busyId === user._id} onClick={() => toggleActive(user)} type="button">{busyId === user._id ? "Saving…" : user.isActive ? "Deactivate" : "Reactivate"}</button>
+                          </div></td>
                         </tr>
                       ))}
                     </tbody>
@@ -160,6 +246,52 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
                 </div>
               )}
       </section>
+
+      {selectedCustomer && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14251f]/45 p-4" role="presentation">
+          <section aria-labelledby="customer-detail-title" aria-modal="true" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-[#dfe9e2] bg-white shadow-2xl" role="dialog">
+            <header className="sticky top-0 z-10 flex items-start justify-between border-b border-[#edf1ee] bg-white px-5 py-4">
+              <div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#829189]">Customer record</p><h2 className="mt-1 text-lg font-semibold text-[#24463a]" id="customer-detail-title">{editingCustomer ? "Edit customer" : selectedCustomer.name}</h2></div>
+              <button aria-label="Close customer details" className="grid size-8 place-items-center rounded-md text-[#73857b] hover:bg-[#f1f6f2]" onClick={() => setSelectedCustomer(null)} type="button"><X className="size-4" /></button>
+            </header>
+            {detailFailure && <div className="px-5 pt-4"><InlineMessage message={detailFailure} /></div>}
+            {detailBusy && !editingCustomer ? <div className="flex justify-center py-12"><LoaderCircle className="size-5 animate-spin text-[#71937c]" /></div> : editingCustomer ? (
+              <form className="space-y-4 p-5" onSubmit={saveCustomer}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="text-xs font-semibold text-[#526d61]">Full name<input className="form-control" defaultValue={selectedCustomer.name} maxLength={120} name="name" required /></label>
+                  <label className="text-xs font-semibold text-[#526d61]">Email<input className="form-control" defaultValue={selectedCustomer.email} name="email" required type="email" /></label>
+                  <label className="text-xs font-semibold text-[#526d61]">Phone<input className="form-control" defaultValue={selectedCustomer.phone ?? ""} maxLength={24} name="phone" type="tel" /></label>
+                  <label className="text-xs font-semibold text-[#526d61]">Address<input className="form-control" defaultValue={selectedCustomer.address ?? ""} maxLength={500} name="address" /></label>
+                </div>
+                <div className="border-t border-[#edf1ee] pt-4">
+                  <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-[#315444]">Additional fields</h3><button className="inline-flex h-8 items-center gap-1 rounded-md border border-[#dfe9e2] px-2.5 text-xs font-semibold text-[#4c8062] hover:bg-[#f5f8f5]" onClick={() => setFieldDrafts([...fieldDrafts, { label: "", value: "" }])} type="button"><Plus className="size-3.5" />Add field</button></div>
+                  {fieldDrafts.length === 0 ? <p className="text-xs text-[#8a9992]">No additional fields.</p> : <div className="space-y-2">
+                    {fieldDrafts.map((field, index) => <div className="grid grid-cols-[1fr_1.4fr_auto] items-center gap-2" key={`field-${index}`}>
+                      <input aria-label={`Field ${index + 1} name`} className="form-control" maxLength={60} onChange={(event) => setFieldDrafts(fieldDrafts.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} placeholder="Field name" value={field.label} />
+                      <input aria-label={`Field ${index + 1} value`} className="form-control" maxLength={500} onChange={(event) => setFieldDrafts(fieldDrafts.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} placeholder="Value" value={field.value} />
+                      <button aria-label={`Remove field ${index + 1}`} className="grid size-9 place-items-center rounded-md text-[#a34343] hover:bg-[#fbefed]" onClick={() => setFieldDrafts(fieldDrafts.filter((_, itemIndex) => itemIndex !== index))} type="button"><Trash2 className="size-4" /></button>
+                    </div>)}
+                  </div>}
+                </div>
+                <div className="flex justify-end gap-2 border-t border-[#edf1ee] pt-4"><button className="h-9 rounded-lg border border-[#dfe9e2] px-3 text-xs font-semibold text-[#526d61]" onClick={() => setEditingCustomer(false)} type="button">Cancel</button><button className="h-9 rounded-lg bg-[#173b33] px-4 text-xs font-semibold text-white disabled:opacity-60" disabled={detailBusy} type="submit">{detailBusy ? "Saving…" : "Save changes"}</button></div>
+              </form>
+            ) : (
+              <div className="space-y-5 p-5">
+                {detailBusy ? <div className="flex justify-center py-4"><LoaderCircle className="size-5 animate-spin text-[#71937c]" /></div> : <>
+                  <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+                    <div><dt className="text-[10px] font-semibold uppercase text-[#829189]">Email</dt><dd className="mt-1 break-all text-sm text-[#315444]">{selectedCustomer.email}</dd></div>
+                    <div><dt className="text-[10px] font-semibold uppercase text-[#829189]">Phone</dt><dd className="mt-1 text-sm text-[#315444]">{selectedCustomer.phone || "—"}</dd></div>
+                    <div><dt className="text-[10px] font-semibold uppercase text-[#829189]">Address</dt><dd className="mt-1 text-sm text-[#315444]">{selectedCustomer.address || "—"}</dd></div>
+                    <div><dt className="text-[10px] font-semibold uppercase text-[#829189]">KYC review</dt><dd className="mt-1 text-sm text-[#315444]">{selectedCustomer.kycStatus.replaceAll("_", " ").toLowerCase()}</dd></div>
+                  </dl>
+                  {selectedCustomer.customFields?.length ? <div className="border-t border-[#edf1ee] pt-4"><h3 className="mb-3 text-sm font-semibold text-[#315444]">Additional fields</h3><dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">{selectedCustomer.customFields.map((field) => <div key={field.label}><dt className="text-[10px] font-semibold uppercase text-[#829189]">{field.label}</dt><dd className="mt-1 break-words text-sm text-[#315444]">{field.value}</dd></div>)}</dl></div> : null}
+                </>}
+                {confirmDelete ? <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#edf1ee] pt-4"><p className="text-xs text-[#9f463f]">Permanently delete this customer? Linked records will prevent deletion.</p><div className="flex gap-2"><button className="h-9 rounded-lg border border-[#dfe9e2] px-3 text-xs font-semibold text-[#526d61]" onClick={() => setConfirmDelete(false)} type="button">Cancel</button><button className="h-9 rounded-lg bg-[#a34343] px-3 text-xs font-semibold text-white disabled:opacity-60" disabled={detailBusy} onClick={() => { void deleteCustomer(); }} type="button">{detailBusy ? "Deleting…" : "Delete customer"}</button></div></div> : <div className="flex justify-end gap-2 border-t border-[#edf1ee] pt-4"><button className="h-9 rounded-lg border border-[#dfe9e2] px-3 text-xs font-semibold text-[#a34343]" onClick={() => setConfirmDelete(true)} type="button"><Trash2 className="mr-1 inline size-3.5" />Delete</button><button className="h-9 rounded-lg bg-[#173b33] px-3 text-xs font-semibold text-white" onClick={() => setEditingCustomer(true)} type="button"><Pencil className="mr-1 inline size-3.5" />Edit customer</button></div>}
+              </div>
+            )}
+          </section>
+        </div>
+      )}
     </div>
   );
 }
