@@ -24,6 +24,10 @@ This guide describes the current Mitra application flows for customers, field ma
 
 If you cannot sign in, check that the account is active, confirm the exact email and password with the organization administrator, and verify that the application can reach MongoDB. Do not share passwords in chat, email, or receipts.
 
+### Install Mitra on a smartphone
+
+Open the deployed HTTPS address in your mobile browser. In Android Chrome, open the browser menu and select **Install app** or **Add to Home screen**. On iPhone or iPad, open the address in Safari, tap **Share**, then choose **Add to Home Screen** and confirm. If the browser does not show the install option, load the site once while online and try again. Mitra requires an internet connection to sign in and access records; its service worker caches only a generic offline notice and never caches private customer or loan data.
+
 ### Account settings
 
 All roles can open **Account settings** to update their name, phone, and address. The sign-in email is read-only here. To change a password, provide the current password and a new password of at least 12 characters, then save. Contact an administrator if the account is inactive or the assigned role is wrong.
@@ -75,6 +79,10 @@ In **Team access**, choose **Add account** and provide the person's name, email,
 - **Customer**: optionally assign an active field manager.
 - **Field manager**: create the manager first, then assign customers and groups to them.
 - **Administrator**: gives organization-wide administrative access; grant sparingly.
+
+Administrators can also create accounts from **Customers** using the **Access role** selector. Accounts created there with a role other than Customer are managed from **Team access**.
+
+When editing a customer, administrators can change the same **Access role**. Changing to a non-customer role moves the account to **Team access** and clears its field-manager assignment.
 
 Search the account list by name or email. Use the KYC review selector to track **Not started**, **Pending**, **Verified**, or **Rejected**. This is a status field, not a document-verification or KYC provider integration. **Deactivate** prevents access; **Reactivate** restores access.
 

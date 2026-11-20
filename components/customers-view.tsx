@@ -4,7 +4,7 @@ import { Eye, LoaderCircle, Pencil, Plus, Search, Trash2, UserRoundPlus, X } fro
 import { useMemo, useState, type FormEvent } from "react";
 import InlineMessage from "@/components/inline-message";
 import { useResource } from "@/components/use-resource";
-import { isOrganizationAdmin, roleLabel, type UserRole } from "@/lib/roles";
+import { isOrganizationAdmin, isUserRole, roleLabel, type UserRole } from "@/lib/roles";
 
 type UserRow = {
   _id: string;
@@ -19,6 +19,14 @@ type UserRow = {
   kycStatus: string;
   createdAt: string;
 };
+
+const ACCOUNT_ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: "user", label: "Customer" },
+  { value: "privileged", label: "Field manager / collection agent" },
+  { value: "admin", label: "Administrator" },
+  { value: "director", label: "Director" },
+  { value: "shareholder", label: "Shareholder" },
+];
 
 async function request(url: string, method: string, body?: Record<string, unknown>) {
   const response = await fetch(url, {
@@ -57,21 +65,29 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
     event.preventDefault();
     const form = event.currentTarget;
     const values = new FormData(form);
-    setBusy(true);
     setFailure("");
     setFeedback("");
+    const requestedRole = isOrganizationAdmin(role) ? values.get("role") : "user";
+    if (!isUserRole(requestedRole)) {
+      setFailure("Select a valid account role.");
+      return;
+    }
+
+    setBusy(true);
     try {
       await request("/api/users", "POST", {
         name: values.get("name"),
         email: values.get("email"),
         password: values.get("password"),
         phone: values.get("phone"),
-        role: isOrganizationAdmin(role) && teamMode ? values.get("role") : "user",
+        role: requestedRole,
         assignedTo: isOrganizationAdmin(role) && teamMode ? values.get("assignedTo") || undefined : undefined,
       });
       form.reset();
       setOpen(false);
-      setFeedback("Account created.");
+      setFeedback(!teamMode && requestedRole !== "user"
+        ? `${roleLabel(requestedRole)} account created. Manage it under Team access.`
+        : "Account created.");
       await reload();
     } catch (caught) {
       setFailure(caught instanceof Error ? caught.message : "Account could not be created.");
@@ -132,6 +148,16 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
     event.preventDefault();
     if (!selectedCustomer) return;
     const values = new FormData(event.currentTarget);
+    let updatedRole: UserRole | undefined;
+    if (isOrganizationAdmin(role)) {
+      const roleValue = values.get("role");
+      if (!isUserRole(roleValue)) {
+        setDetailFailure("Select a valid account role.");
+        return;
+      }
+      updatedRole = roleValue;
+    }
+
     const customFields = fieldDrafts
       .map((field) => ({ label: field.label.trim(), value: field.value.trim() }))
       .filter((field) => field.label || field.value);
@@ -149,8 +175,13 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
         phone: values.get("phone"),
         address: values.get("address"),
         customFields,
+        ...(updatedRole ? { role: updatedRole } : {}),
       });
-      setFeedback(`${selectedCustomer.name}'s details were updated.`);
+      if (updatedRole !== undefined && updatedRole !== selectedCustomer.role && updatedRole !== "user") {
+        setFeedback(`${roleLabel(updatedRole)} account updated. Manage it under Team access.`);
+      } else {
+        setFeedback(`${selectedCustomer.name}'s details were updated.`);
+      }
       setSelectedCustomer(null);
       await reload();
     } catch (caught) {
@@ -188,13 +219,17 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
     </div>
   );
 
+  const addAccountLabel = isOrganizationAdmin(role)
+    ? teamMode ? "a team account" : "an account"
+    : "a customer";
+
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-2xl border border-[#dfe9e2] bg-white">
         <button aria-expanded={open} className="flex w-full items-center justify-between gap-2 px-4 py-4 text-left sm:px-5" onClick={() => setOpen(!open)} type="button">
           <span className="flex min-w-0 items-center gap-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#eaf4ed] text-[#4b7c58]"><UserRoundPlus className="h-4 w-4" /></span>
-            <span className="min-w-0"><span className="block text-sm font-semibold text-[#24463a]">Add {isOrganizationAdmin(role) && teamMode ? "a team account" : "a customer"}</span><span className="mt-1 block text-xs leading-5 text-[#8a9992]">Accounts are created by an authorized administrator or field manager</span></span>
+            <span className="min-w-0"><span className="block text-sm font-semibold text-[#24463a]">Add {addAccountLabel}</span><span className="mt-1 block text-xs leading-5 text-[#8a9992]">Accounts are created by an authorized administrator or field manager</span></span>
           </span>
           <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#4c8062]"><Plus className="h-4 w-4" /><span className="hidden sm:inline">Add account</span></span>
         </button>
@@ -204,14 +239,14 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
             <label className="text-xs font-semibold text-[#526d61]">Email<input className="form-control" name="email" required type="email" /></label>
             <label className="text-xs font-semibold text-[#526d61]">Phone (optional)<input className="form-control" maxLength={24} name="phone" type="tel" /></label>
             <label className="text-xs font-semibold text-[#526d61]">Temporary password<input className="form-control" minLength={12} name="password" required type="password" /></label>
-            {isOrganizationAdmin(role) && teamMode && (
+            {isOrganizationAdmin(role) && (
               <>
                 <label className="text-xs font-semibold text-[#526d61]">Access role
-                  <select className="form-control" name="role"><option value="user">Customer</option><option value="privileged">Field manager / collection agent</option><option value="admin">Administrator</option><option value="director">Director</option><option value="shareholder">Shareholder</option></select>
+                  <select className="form-control" name="role">{ACCOUNT_ROLE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
                 </label>
-                <label className="text-xs font-semibold text-[#526d61]">Assigned field manager
+                {teamMode && <label className="text-xs font-semibold text-[#526d61]">Assigned field manager
                   <select className="form-control" name="assignedTo"><option value="">Unassigned</option>{managers.map((manager) => <option key={manager._id} value={manager._id}>{manager.name}</option>)}</select>
-                </label>
+                </label>}
               </>
             )}
             <div className="flex items-end"><button className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#173b33] px-4 text-sm font-semibold text-white hover:bg-[#245548] disabled:opacity-60 sm:h-10" disabled={busy} type="submit">{busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{busy ? "Creating…" : "Create account"}</button></div>
@@ -284,6 +319,9 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
                   <label className="text-xs font-semibold text-[#526d61]">Email<input className="form-control" defaultValue={selectedCustomer.email} name="email" required type="email" /></label>
                   <label className="text-xs font-semibold text-[#526d61]">Phone<input className="form-control" defaultValue={selectedCustomer.phone ?? ""} maxLength={24} name="phone" type="tel" /></label>
                   <label className="text-xs font-semibold text-[#526d61]">Address<input className="form-control" defaultValue={selectedCustomer.address ?? ""} maxLength={500} name="address" /></label>
+                  {isOrganizationAdmin(role) && <label className="text-xs font-semibold text-[#526d61]">Access role
+                    <select className="form-control" defaultValue={selectedCustomer.role} name="role">{ACCOUNT_ROLE_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+                  </label>}
                 </div>
                 <div className="border-t border-[#edf1ee] pt-4">
                   <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-[#315444]">Additional fields</h3><button className="inline-flex h-8 items-center gap-1 rounded-md border border-[#dfe9e2] px-2.5 text-xs font-semibold text-[#4c8062] hover:bg-[#f5f8f5]" onClick={() => setFieldDrafts([...fieldDrafts, { label: "", value: "" }])} type="button"><Plus className="size-3.5" />Add field</button></div>

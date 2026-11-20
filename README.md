@@ -11,6 +11,7 @@ For detailed role-by-role instructions covering administrator, director, shareho
 - Loan application, borrower-consented credit-check, administrator approval/rejection, sandbox disbursement, installment collections, and printable receipts.
 - Joint-liability groups, field-collected cash/UPI/bank-transfer records, collection notification adapter, PAR 30/60/90 portfolio views, and append-only application audit events.
 - Business expense records, director and field-manager payroll with earnings/deductions and monthly reports, and compressed customer document uploads to private Vercel Blob with authorized previews and downloads.
+- Installable PWA for smartphone home screens, with a privacy-safe offline notice and no offline caching of customer or loan records.
 - Credit-bureau, disbursement, and notification interfaces currently use clearly labeled sandbox implementations. Sandbox bureau output is not a report and cannot support a real credit decision; sandbox disbursement never transfers funds.
 
 ## Requirements
@@ -29,6 +30,8 @@ For detailed role-by-role instructions covering administrator, director, shareho
 3. Set `ADMIN_NAME` and `ADMIN_EMAIL` in `.env.local` for the first administrator. Leave `ADMIN_PASSWORD` blank to have the bootstrap command generate and display a secure one-time password, or set your own temporary password of at least 12 characters. Run `npm run setup:admin`, save the generated password if applicable, then remove any temporary password from the environment. The command refuses to create a second administrator.
 4. Run `npm run dev` and sign in with the bootstrap account.
 5. Create an active loan product, then provision field managers and customers in **Team access**. Assign customers to a field manager before using group/collection workflows.
+
+On a deployed HTTPS URL, install Mitra from the browser: in Android Chrome, open the menu and choose **Install app** (or **Add to Home screen**); on iPhone/iPad, open the site in Safari, tap **Share**, then **Add to Home Screen**. The app requires connectivity for sign-in and records; its service worker caches only a generic offline notice, never customer or loan data.
 
 For local MongoDB, start MongoDB as a replica set and initialize it before connecting. Never commit `.env.local` or real credentials.
 
