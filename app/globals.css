@@ -130,5 +130,19 @@
 }
 
 .form-control {
-  @apply mt-2 h-10 w-full rounded-lg border border-[#dce5e1] bg-white px-3 text-xs font-normal text-[#29483d] outline-none transition focus:border-[#6b9a7c] focus:ring-2 focus:ring-[#6b9a7c]/15;
+  @apply mt-2 h-11 w-full min-w-0 rounded-lg border border-[#dce5e1] bg-white px-3 text-sm font-normal text-[#29483d] outline-none transition focus:border-[#6b9a7c] focus:ring-2 focus:ring-[#6b9a7c]/15 sm:h-10 sm:text-xs;
+}
+
+@media (max-width: 639px) {
+  input,
+  select,
+  textarea,
+  button {
+    scroll-margin-bottom: 1rem;
+  }
+
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }

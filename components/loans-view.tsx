@@ -49,6 +49,7 @@ type Loan = {
   creditCheck?: { provider: string; status: "SANDBOX" | "COMPLETED" | "FAILED"; checkedAt: string; consentedAt?: string; decisionEligible: boolean };
   schedule: { installmentNo: number; dueDate: string; totalDuePaise: number; status: string }[];
 };
+type LoanActionName = "approve" | "approve_without_credit_check" | "reject" | "disburse" | "credit";
 
 function rupees(paise: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(paise / 100);
@@ -81,7 +82,7 @@ export default function LoansView({ actorId, role }: { actorId: string; role: Us
     return items.filter((loan) => `${loan.borrower?.name ?? ""} ${loan.product?.name ?? ""} ${loan.status}`.toLowerCase().includes(query.toLowerCase()));
   }, [data, query]);
 
-  async function action(loan: Loan, actionName: "approve" | "approve_without_credit_check" | "reject" | "disburse" | "credit") {
+  async function action(loan: Loan, actionName: LoanActionName) {
     setBusyId(loan._id);
     setFailure("");
     setMessage("");
@@ -138,7 +139,46 @@ export default function LoansView({ actorId, role }: { actorId: string; role: Us
             <p className="mt-1 text-xs text-[#89968f]">Create a loan application to begin servicing an account.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+          <div className="divide-y divide-[#edf1ee] sm:hidden">
+            {loans.map((loan) => {
+              const next = loan.schedule?.find((installment) => installment.status !== "PAID");
+              return (
+                <article className="space-y-3 p-4" key={loan._id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-semibold text-[#29483d]">{loan.borrower?.name ?? "Customer"}</p>
+                      <p className="mt-1 break-words text-xs text-[#73857b]">{loan.product?.name ?? "Loan product"}</p>
+                      <p className="mt-1 text-[10px] text-[#91a098]">Applied {date(loan.createdAt)} · {loan.annualInterestRatePercent}% p.a.</p>
+                    </div>
+                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                      loan.status === "ACTIVE" ? "bg-[#eaf4ed] text-[#397253]"
+                        : loan.status === "PENDING_APPROVAL" ? "bg-[#fbf2dc] text-[#9e792c]"
+                          : loan.status === "REJECTED" ? "bg-[#fbe9e5] text-[#a34d40]"
+                            : "bg-[#edf2ef] text-[#667d72]"
+                    }`}>{loan.status.replaceAll("_", " ").toLowerCase()}</span>
+                  </div>
+                  <dl className="grid grid-cols-2 gap-x-3 gap-y-3 border-t border-[#f0f3f0] pt-3 text-xs">
+                    <div><dt className="text-[#91a098]">Principal</dt><dd className="mt-1 font-semibold text-[#315444]">{rupees(loan.principalPaise)}</dd></div>
+                    <div><dt className="text-[#91a098]">Term / cadence</dt><dd className="mt-1 text-[#6f8179]">{loan.tenureMonths} months · {loan.frequency.toLowerCase()}</dd></div>
+                    <div className="col-span-2"><dt className="text-[#91a098]">Next installment</dt><dd className="mt-1 text-[#6f8179]">{next ? `${date(next.dueDate)} · ${rupees(next.totalDuePaise)}` : loan.status === "PENDING_APPROVAL" ? `Est. ${rupees(loan.estimatedMonthlyInstallmentPaise)}/mo` : loan.status === "ACTIVE" ? "Schedule pending" : "—"}</dd></div>
+                    <div className="col-span-2"><dt className="text-[#91a098]">Affordability</dt><dd className={`mt-1 font-medium ${loan.affordabilityPassed ? "text-[#56815f]" : "text-[#a36e31]"}`}>{loan.debtToIncomePercent.toFixed(1)}% debt-to-income · {loan.affordabilityPassed ? "within product limit" : "above product limit"}</dd></div>
+                  </dl>
+                  {loan.creditCheck?.status === "SANDBOX" && <p className="text-xs text-[#a07832]">Sandbox bureau check</p>}
+                  <LoanActions
+                    actorId={actorId}
+                    idSuffix="mobile"
+                    isProduction={data?.isProduction ?? false}
+                    loan={loan}
+                    onAction={action}
+                    role={role}
+                    working={busyId === loan._id}
+                  />
+                </article>
+              );
+            })}
+          </div>
+          <div className="hidden overflow-x-auto sm:block">
             <table className="w-full min-w-[850px] border-collapse text-left">
               <thead className="bg-[#f8faf8] text-[10px] font-semibold uppercase tracking-[0.11em] text-[#87968e]">
                 <tr>
@@ -149,11 +189,6 @@ export default function LoansView({ actorId, role }: { actorId: string; role: Us
                 {loans.map((loan) => {
                   const next = loan.schedule?.find((installment) => installment.status !== "PAID");
                   const working = busyId === loan._id;
-                  const approvalBlocker = getLoanApprovalBlocker({
-                    affordabilityPassed: loan.affordabilityPassed,
-                    creditCheck: loan.creditCheck,
-                    isProduction: data?.isProduction ?? false,
-                  });
                   return (
                     <tr className="align-top" key={loan._id}>
                       <td className="px-5 py-4">
@@ -180,42 +215,69 @@ export default function LoansView({ actorId, role }: { actorId: string; role: Us
                         <span className={`font-medium ${loan.affordabilityPassed ? "text-[#56815f]" : "text-[#a36e31]"}`}>{loan.debtToIncomePercent.toFixed(1)}% debt-to-income</span>
                         <p className="mt-1 text-[10px] text-[#99a49e]">{loan.affordabilityPassed ? "Within product limit" : "Above product limit"}</p>
                       </td>
-                      <td className="px-5 py-4">
-                        <div className="flex flex-wrap gap-1.5">
-                          {loan.status === "PENDING_APPROVAL" && loan.borrower?._id === actorId && !loan.creditCheck && (
-                            <button className="inline-flex items-center gap-1 rounded-md border border-[#d9e8dd] px-2 py-1.5 text-[10px] font-semibold text-[#437450] hover:bg-[#f2f8f3] disabled:opacity-50" disabled={working} onClick={() => action(loan, "credit")} type="button">
-                              <ShieldCheck className="h-3.5 w-3.5" /> Consent + check
-                            </button>
-                          )}
-                          {isOrganizationAdmin(role) && loan.status === "PENDING_APPROVAL" && (
-                            <>
-                              <button aria-describedby={approvalBlocker ? `approval-blocker-${loan._id}` : undefined} className="inline-flex items-center gap-1 rounded-md bg-[#e9f4eb] px-2 py-1.5 text-[10px] font-semibold text-[#3d744d] hover:bg-[#ddefe0] disabled:cursor-not-allowed disabled:opacity-50" disabled={working || Boolean(approvalBlocker)} onClick={() => action(loan, "approve")} title={approvalBlocker ?? undefined} type="button"><Check className="h-3.5 w-3.5" />Approve</button>
-                              {approvalBlocker && loan.affordabilityPassed && <button className="inline-flex items-center gap-1 rounded-md border border-[#e7c98c] px-2 py-1.5 text-[10px] font-semibold text-[#886423] hover:bg-[#fff9eb] disabled:opacity-50" disabled={working} onClick={() => action(loan, "approve_without_credit_check")} title="Bypass only the credit-check requirement; a reason is required and affordability must still pass." type="button"><Check className="h-3.5 w-3.5" />Approve without bureau check</button>}
-                              <button className="inline-flex items-center gap-1 rounded-md border border-[#f0dfdc] px-2 py-1.5 text-[10px] font-semibold text-[#a55649] hover:bg-[#fff6f4] disabled:opacity-50" disabled={working} onClick={() => action(loan, "reject")} type="button"><X className="h-3.5 w-3.5" />Decline</button>
-                              {approvalBlocker && <p className="basis-full text-[10px] leading-4 text-[#986b29]" id={`approval-blocker-${loan._id}`}>{approvalBlocker}</p>}
-                            </>
-                          )}
-                          {!isOrganizationAdmin(role) && loan.status === "PENDING_APPROVAL" && <p className="basis-full text-[10px] leading-4 text-[#87958e]">An organization administrator makes the approval decision.</p>}
-                          {isOrganizationAdmin(role) && loan.status === "APPROVED" && (
-                            data?.isProduction
-                              ? <span className="text-[10px] leading-4 text-[#986b29]">Live disbursement is not configured in production.</span>
-                              : <button className="inline-flex items-center gap-1 rounded-md bg-[#173b33] px-2 py-1.5 text-[10px] font-semibold text-white hover:bg-[#245548] disabled:opacity-50" disabled={working} onClick={() => action(loan, "disburse")} type="button"><ArrowDownToLine className="h-3.5 w-3.5" />Disburse</button>
-                          )}
-                          {working && <LoaderCircle className="h-4 w-4 animate-spin text-[#769280]" />}
-                        </div>
-                      </td>
+                      <td className="px-5 py-4"><LoanActions actorId={actorId} idSuffix="desktop" isProduction={data?.isProduction ?? false} loan={loan} onAction={action} role={role} working={working} /></td>
                     </tr>
                   );
                 })}
               </tbody>
             </table>
           </div>
+          </>
         )}
         <div className="flex items-start gap-2 border-t border-[#edf1ee] bg-[#fafbf9] px-5 py-3 text-[11px] leading-5 text-[#87958e]">
           <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#a48c55]" />
           Bureau checks and disbursements are sandbox-only until live provider agreements and credentials are configured. Sandbox results must not be used for real lending decisions.
         </div>
       </section>
+    </div>
+  );
+}
+
+function LoanActions({
+  loan,
+  actorId,
+  idSuffix,
+  role,
+  isProduction,
+  working,
+  onAction,
+}: {
+  loan: Loan;
+  actorId: string;
+  idSuffix: string;
+  role: UserRole;
+  isProduction: boolean;
+  working: boolean;
+  onAction: (loan: Loan, actionName: LoanActionName) => Promise<void>;
+}) {
+  const approvalBlocker = getLoanApprovalBlocker({
+    affordabilityPassed: loan.affordabilityPassed,
+    creditCheck: loan.creditCheck,
+    isProduction,
+  });
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {loan.status === "PENDING_APPROVAL" && loan.borrower?._id === actorId && !loan.creditCheck && (
+        <button className="inline-flex min-h-10 items-center gap-1 rounded-md border border-[#d9e8dd] px-2.5 py-1.5 text-[11px] font-semibold text-[#437450] hover:bg-[#f2f8f3] disabled:opacity-50" disabled={working} onClick={() => onAction(loan, "credit")} type="button">
+          <ShieldCheck className="h-3.5 w-3.5" /> Consent + check
+        </button>
+      )}
+      {isOrganizationAdmin(role) && loan.status === "PENDING_APPROVAL" && (
+        <>
+          <button aria-describedby={approvalBlocker ? `approval-blocker-${loan._id}-${idSuffix}` : undefined} className="inline-flex min-h-10 items-center gap-1 rounded-md bg-[#e9f4eb] px-2.5 py-1.5 text-[11px] font-semibold text-[#3d744d] hover:bg-[#ddefe0] disabled:cursor-not-allowed disabled:opacity-50" disabled={working || Boolean(approvalBlocker)} onClick={() => onAction(loan, "approve")} title={approvalBlocker ?? undefined} type="button"><Check className="h-3.5 w-3.5" />Approve</button>
+          {approvalBlocker && loan.affordabilityPassed && <button className="inline-flex min-h-10 items-center gap-1 rounded-md border border-[#e7c98c] px-2.5 py-1.5 text-[11px] font-semibold text-[#886423] hover:bg-[#fff9eb] disabled:opacity-50" disabled={working} onClick={() => onAction(loan, "approve_without_credit_check")} title="Bypass only the credit-check requirement; a reason is required and affordability must still pass." type="button"><Check className="h-3.5 w-3.5" />Approve without bureau check</button>}
+          <button className="inline-flex min-h-10 items-center gap-1 rounded-md border border-[#f0dfdc] px-2.5 py-1.5 text-[11px] font-semibold text-[#a55649] hover:bg-[#fff6f4] disabled:opacity-50" disabled={working} onClick={() => onAction(loan, "reject")} type="button"><X className="h-3.5 w-3.5" />Decline</button>
+          {approvalBlocker && <p className="basis-full text-[11px] leading-4 text-[#986b29]" id={`approval-blocker-${loan._id}-${idSuffix}`}>{approvalBlocker}</p>}
+        </>
+      )}
+      {!isOrganizationAdmin(role) && loan.status === "PENDING_APPROVAL" && <p className="basis-full text-[11px] leading-4 text-[#87958e]">An organization administrator makes the approval decision.</p>}
+      {isOrganizationAdmin(role) && loan.status === "APPROVED" && (
+        isProduction
+          ? <span className="text-[11px] leading-4 text-[#986b29]">Live disbursement is not configured in production.</span>
+          : <button className="inline-flex min-h-10 items-center gap-1 rounded-md bg-[#173b33] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#245548] disabled:opacity-50" disabled={working} onClick={() => onAction(loan, "disburse")} type="button"><ArrowDownToLine className="h-3.5 w-3.5" />Disburse</button>
+      )}
+      {working && <LoaderCircle className="h-5 w-5 animate-spin self-center text-[#769280]" />}
     </div>
   );
 }
@@ -286,12 +348,12 @@ function LoanApplicationForm({ role, onCreated }: { role: UserRole; onCreated: (
 
   return (
     <section className="overflow-hidden rounded-2xl border border-[#dfe9e2] bg-white">
-      <button className="flex w-full items-center justify-between px-5 py-4 text-left" onClick={() => setOpen(!open)} type="button">
-        <span className="flex items-center gap-3">
-          <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#eaf4ed] text-[#4b7c58]"><Plus className="h-4 w-4" /></span>
-          <span><span className="block text-sm font-semibold text-[#24463a]">Create a loan application</span><span className="mt-1 block text-xs text-[#8a9992]">Start a new application using an approved loan product</span></span>
+      <button aria-expanded={open} className="flex w-full items-center justify-between gap-2 px-4 py-4 text-left sm:px-5" onClick={() => setOpen(!open)} type="button">
+        <span className="flex min-w-0 items-center gap-3">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#eaf4ed] text-[#4b7c58]"><Plus className="h-4 w-4" /></span>
+          <span className="min-w-0"><span className="block text-sm font-semibold text-[#24463a]">Create a loan application</span><span className="mt-1 block text-xs leading-5 text-[#8a9992]">Start a new application using an approved loan product</span></span>
         </span>
-        <span className="text-xs font-semibold text-[#4c8062]">{open ? "Close" : "New application"}</span>
+        <span className="shrink-0 text-xs font-semibold text-[#4c8062]">{open ? "Close" : <><span className="sm:hidden">New</span><span className="hidden sm:inline">New application</span></>}</span>
       </button>
       {open && (
         <form className="grid gap-4 border-t border-[#edf1ee] bg-[#fbfcfb] p-5 sm:grid-cols-2 xl:grid-cols-5" onSubmit={submit}>
@@ -336,7 +398,7 @@ function LoanApplicationForm({ role, onCreated }: { role: UserRole; onCreated: (
             <select className="form-control" name="groupId"><option value="">No group</option>{(groupsData?.groups ?? []).map((group) => <option key={group._id} value={group._id}>{group.name} · {group.centerName}</option>)}</select>
           </label>}
           <div className="flex items-end">
-            <button className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#173b33] px-4 text-sm font-semibold text-white hover:bg-[#245548] disabled:opacity-60" disabled={busy || !productsData?.products.length || (role !== "user" && !usersData?.users.length)} type="submit">
+            <button className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#173b33] px-4 text-sm font-semibold text-white hover:bg-[#245548] disabled:opacity-60 sm:h-10" disabled={busy || !productsData?.products.length || (role !== "user" && !usersData?.users.length)} type="submit">
               {busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{busy ? "Saving…" : "Submit application"}
             </button>
           </div>

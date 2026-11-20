@@ -177,15 +177,26 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
     }
   }
 
+  const accountActions = (user: UserRow) => (
+    <div className="flex flex-wrap items-center gap-2">
+      {user.role === "user" && !teamMode && <>
+        <button aria-label={`View ${user.name}`} className="grid min-h-11 min-w-11 place-items-center rounded-md text-[#668272] hover:bg-[#f1f6f2] hover:text-[#274c38]" onClick={() => openCustomer(user)} title="View customer" type="button"><Eye className="size-4" /></button>
+        <button aria-label={`Edit ${user.name}`} className="grid min-h-11 min-w-11 place-items-center rounded-md text-[#668272] hover:bg-[#f1f6f2] hover:text-[#274c38]" onClick={() => openCustomer(user, true)} title="Edit customer" type="button"><Pencil className="size-4" /></button>
+        <button aria-label={`Delete ${user.name}`} className="grid min-h-11 min-w-11 place-items-center rounded-md text-[#a34343] hover:bg-[#fbefed]" onClick={() => { void openCustomer(user, false, true); }} title="Delete customer" type="button"><Trash2 className="size-4" /></button>
+      </>}
+      <button className="min-h-11 px-2 text-xs font-semibold text-[#668272] hover:text-[#274c38] disabled:opacity-50" disabled={busyId === user._id} onClick={() => toggleActive(user)} type="button">{busyId === user._id ? "Saving…" : user.isActive ? "Deactivate" : "Reactivate"}</button>
+    </div>
+  );
+
   return (
     <div className="space-y-5">
       <section className="overflow-hidden rounded-2xl border border-[#dfe9e2] bg-white">
-        <button className="flex w-full items-center justify-between px-5 py-4 text-left" onClick={() => setOpen(!open)} type="button">
-          <span className="flex items-center gap-3">
-            <span className="grid h-9 w-9 place-items-center rounded-xl bg-[#eaf4ed] text-[#4b7c58]"><UserRoundPlus className="h-4 w-4" /></span>
-            <span><span className="block text-sm font-semibold text-[#24463a]">Add {isOrganizationAdmin(role) && teamMode ? "a team account" : "a customer"}</span><span className="mt-1 block text-xs text-[#8a9992]">Accounts are created by an authorized administrator or field manager</span></span>
+        <button aria-expanded={open} className="flex w-full items-center justify-between gap-2 px-4 py-4 text-left sm:px-5" onClick={() => setOpen(!open)} type="button">
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#eaf4ed] text-[#4b7c58]"><UserRoundPlus className="h-4 w-4" /></span>
+            <span className="min-w-0"><span className="block text-sm font-semibold text-[#24463a]">Add {isOrganizationAdmin(role) && teamMode ? "a team account" : "a customer"}</span><span className="mt-1 block text-xs leading-5 text-[#8a9992]">Accounts are created by an authorized administrator or field manager</span></span>
           </span>
-          <span className="inline-flex items-center gap-1 text-xs font-semibold text-[#4c8062]"><Plus className="h-4 w-4" />Add account</span>
+          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-[#4c8062]"><Plus className="h-4 w-4" /><span className="hidden sm:inline">Add account</span></span>
         </button>
         {open && (
           <form className="grid gap-4 border-t border-[#edf1ee] bg-[#fbfcfb] p-5 sm:grid-cols-2 xl:grid-cols-4" onSubmit={createUser}>
@@ -203,7 +214,7 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
                 </label>
               </>
             )}
-            <div className="flex items-end"><button className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#173b33] px-4 text-sm font-semibold text-white hover:bg-[#245548] disabled:opacity-60" disabled={busy} type="submit">{busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{busy ? "Creating…" : "Create account"}</button></div>
+            <div className="flex items-end"><button className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#173b33] px-4 text-sm font-semibold text-white hover:bg-[#245548] disabled:opacity-60 sm:h-10" disabled={busy} type="submit">{busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{busy ? "Creating…" : "Create account"}</button></div>
             <p className="self-end text-[11px] leading-5 text-[#85938c]">Passwords must be at least 12 characters. Share temporary credentials securely.</p>
           </form>
         )}
@@ -219,8 +230,26 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
         {loading ? <div className="flex justify-center py-12"><LoaderCircle className="h-5 w-5 animate-spin text-[#71937c]" /></div>
           : error ? <div className="p-5"><InlineMessage message={error} /></div>
             : rows.length === 0 ? <p className="px-5 py-12 text-center text-sm text-[#87958e]">No accounts found. Add an account to get started.</p>
-              : (
-                <div className="overflow-x-auto">
+              : <>
+                <div className="divide-y divide-[#edf1ee] sm:hidden">
+                  {rows.map((user) => (
+                    <article className="space-y-3 p-4" key={user._id}>
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-semibold text-[#29483d]">{user.name}</p>
+                        <p className="mt-1 break-all text-xs text-[#8a9992]">{user.email}</p>
+                        {user.phone && <p className="mt-1 text-xs text-[#8a9992]">{user.phone}</p>}
+                      </div>
+                      <dl className="grid grid-cols-2 gap-x-3 gap-y-3 border-t border-[#f0f3f0] pt-3 text-xs">
+                        <div><dt className="text-[#91a098]">Role</dt><dd className="mt-1 text-[#60776c]">{roleLabel(user.role)}</dd></div>
+                        <div><dt className="text-[#91a098]">Assigned to</dt><dd className="mt-1 break-words text-[#74867d]">{typeof user.assignedTo === "object" && user.assignedTo ? user.assignedTo.name : "—"}</dd></div>
+                        <div><dt className="text-[#91a098]">KYC review</dt><dd className="mt-1"><select aria-label={`KYC review status for ${user.name}`} className="mt-1 h-10 w-full rounded-lg border border-[#e4ebe6] bg-white px-2 text-xs text-[#60776c] outline-none focus:border-[#6b9a7c]" disabled={kycBusyId === user._id} onChange={(event) => updateKycStatus(user, event.target.value)} value={user.kycStatus}><option value="NOT_STARTED">Not started</option><option value="PENDING">Pending</option><option value="VERIFIED">Verified</option><option value="REJECTED">Rejected</option></select></dd></div>
+                        <div><dt className="text-[#91a098]">Status</dt><dd className="mt-1"><span className={`inline-flex rounded-full px-2 py-1 text-[10px] font-semibold ${user.isActive ? "bg-[#eaf4ed] text-[#397253]" : "bg-[#f2e9e7] text-[#9f5f52]"}`}>{user.isActive ? "Active" : "Inactive"}</span></dd></div>
+                      </dl>
+                      <div className="border-t border-[#f0f3f0] pt-2">{accountActions(user)}</div>
+                    </article>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto sm:block">
                   <table className="w-full min-w-[780px] text-left">
                     <thead className="bg-[#f8faf8] text-[10px] font-semibold uppercase tracking-[0.11em] text-[#87968e]"><tr><th className="px-5 py-3">Account</th><th className="px-5 py-3">Role</th><th className="px-5 py-3">Assigned to</th><th className="px-5 py-3">KYC review</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Action</th></tr></thead>
                     <tbody className="divide-y divide-[#f0f3f0]">
@@ -229,28 +258,21 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
                           <td className="px-5 py-4"><p className="text-sm font-medium text-[#29483d]">{user.name}</p><p className="mt-1 text-xs text-[#8a9992]">{user.email}{user.phone ? ` · ${user.phone}` : ""}</p></td>
                           <td className="px-5 py-4 text-xs text-[#60776c]">{roleLabel(user.role)}</td>
                           <td className="px-5 py-4 text-xs text-[#74867d]">{typeof user.assignedTo === "object" && user.assignedTo ? user.assignedTo.name : "—"}</td>
-                          <td className="px-5 py-4"><select aria-label={`KYC review status for ${user.name}`} className="rounded-lg border border-[#e4ebe6] bg-white px-2 py-1.5 text-[10px] text-[#60776c] outline-none focus:border-[#6b9a7c]" disabled={kycBusyId === user._id} onChange={(event) => updateKycStatus(user, event.target.value)} value={user.kycStatus}><option value="NOT_STARTED">Not started</option><option value="PENDING">Pending</option><option value="VERIFIED">Verified</option><option value="REJECTED">Rejected</option></select></td>
+                          <td className="px-5 py-4"><select aria-label={`KYC review status for ${user.name}`} className="min-h-10 rounded-lg border border-[#e4ebe6] bg-white px-2 py-1.5 text-xs text-[#60776c] outline-none focus:border-[#6b9a7c]" disabled={kycBusyId === user._id} onChange={(event) => updateKycStatus(user, event.target.value)} value={user.kycStatus}><option value="NOT_STARTED">Not started</option><option value="PENDING">Pending</option><option value="VERIFIED">Verified</option><option value="REJECTED">Rejected</option></select></td>
                           <td className="px-5 py-4"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${user.isActive ? "bg-[#eaf4ed] text-[#397253]" : "bg-[#f2e9e7] text-[#9f5f52]"}`}>{user.isActive ? "Active" : "Inactive"}</span></td>
-                          <td className="px-5 py-4"><div className="flex items-center gap-1">
-                            {user.role === "user" && !teamMode && <>
-                              <button aria-label={`View ${user.name}`} className="grid size-8 place-items-center rounded-md text-[#668272] hover:bg-[#f1f6f2] hover:text-[#274c38]" onClick={() => openCustomer(user)} title="View customer" type="button"><Eye className="size-4" /></button>
-                              <button aria-label={`Edit ${user.name}`} className="grid size-8 place-items-center rounded-md text-[#668272] hover:bg-[#f1f6f2] hover:text-[#274c38]" onClick={() => openCustomer(user, true)} title="Edit customer" type="button"><Pencil className="size-4" /></button>
-                              <button aria-label={`Delete ${user.name}`} className="grid size-8 place-items-center rounded-md text-[#a34343] hover:bg-[#fbefed]" onClick={() => { void openCustomer(user, false, true); }} title="Delete customer" type="button"><Trash2 className="size-4" /></button>
-                            </>}
-                            <button className="ml-1 text-xs font-semibold text-[#668272] hover:text-[#274c38] disabled:opacity-50" disabled={busyId === user._id} onClick={() => toggleActive(user)} type="button">{busyId === user._id ? "Saving…" : user.isActive ? "Deactivate" : "Reactivate"}</button>
-                          </div></td>
+                          <td className="px-5 py-4">{accountActions(user)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              )}
+              </>}
       </section>
 
       {selectedCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14251f]/45 p-4" role="presentation">
-          <section aria-labelledby="customer-detail-title" aria-modal="true" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-[#dfe9e2] bg-white shadow-2xl" role="dialog">
-            <header className="sticky top-0 z-10 flex items-start justify-between border-b border-[#edf1ee] bg-white px-5 py-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14251f]/45 p-2 sm:p-4" role="presentation">
+          <section aria-labelledby="customer-detail-title" aria-modal="true" className="max-h-[calc(100dvh-1rem)] w-full max-w-2xl overflow-y-auto rounded-xl border border-[#dfe9e2] bg-white shadow-2xl sm:max-h-[90vh]" role="dialog">
+            <header className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-[#edf1ee] bg-white px-4 py-4 sm:px-5">
               <div><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#829189]">Customer record</p><h2 className="mt-1 text-lg font-semibold text-[#24463a]" id="customer-detail-title">{editingCustomer ? "Edit customer" : selectedCustomer.name}</h2></div>
               <button aria-label="Close customer details" className="grid size-8 place-items-center rounded-md text-[#73857b] hover:bg-[#f1f6f2]" onClick={() => setSelectedCustomer(null)} type="button"><X className="size-4" /></button>
             </header>
@@ -266,7 +288,7 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
                 <div className="border-t border-[#edf1ee] pt-4">
                   <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-[#315444]">Additional fields</h3><button className="inline-flex h-8 items-center gap-1 rounded-md border border-[#dfe9e2] px-2.5 text-xs font-semibold text-[#4c8062] hover:bg-[#f5f8f5]" onClick={() => setFieldDrafts([...fieldDrafts, { label: "", value: "" }])} type="button"><Plus className="size-3.5" />Add field</button></div>
                   {fieldDrafts.length === 0 ? <p className="text-xs text-[#8a9992]">No additional fields.</p> : <div className="space-y-2">
-                    {fieldDrafts.map((field, index) => <div className="grid grid-cols-[1fr_1.4fr_auto] items-center gap-2" key={`field-${index}`}>
+                    {fieldDrafts.map((field, index) => <div className="grid min-w-0 grid-cols-1 items-center gap-2 sm:grid-cols-[1fr_1.4fr_auto]" key={`field-${index}`}>
                       <input aria-label={`Field ${index + 1} name`} className="form-control" maxLength={60} onChange={(event) => setFieldDrafts(fieldDrafts.map((item, itemIndex) => itemIndex === index ? { ...item, label: event.target.value } : item))} placeholder="Field name" value={field.label} />
                       <input aria-label={`Field ${index + 1} value`} className="form-control" maxLength={500} onChange={(event) => setFieldDrafts(fieldDrafts.map((item, itemIndex) => itemIndex === index ? { ...item, value: event.target.value } : item))} placeholder="Value" value={field.value} />
                       <button aria-label={`Remove field ${index + 1}`} className="grid size-9 place-items-center rounded-md text-[#a34343] hover:bg-[#fbefed]" onClick={() => setFieldDrafts(fieldDrafts.filter((_, itemIndex) => itemIndex !== index))} type="button"><Trash2 className="size-4" /></button>

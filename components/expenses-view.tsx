@@ -73,7 +73,7 @@ export default function ExpensesView() {
           <label className="text-xs font-semibold text-[#526d61]">Payee<input className="form-control" maxLength={120} name="payee" required /></label>
           <label className="text-xs font-semibold text-[#526d61]">Receipt storage reference (optional)<input className="form-control" maxLength={300} name="receiptStorageRef" placeholder="receipts/2026/INV-001.pdf" /></label>
           <label className="text-xs font-semibold text-[#526d61]">Notes (optional)<input className="form-control" maxLength={1000} name="notes" /></label>
-          <div className="sm:col-span-2 xl:col-span-3"><button className="flex h-10 items-center justify-center gap-2 rounded-lg bg-[#173b33] px-4 text-sm font-semibold text-white hover:bg-[#245548] disabled:opacity-60" disabled={busy} type="submit">{busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{busy ? "Saving…" : "Save expense"}</button></div>
+          <div className="sm:col-span-2 xl:col-span-3"><button className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#173b33] px-4 text-sm font-semibold text-white hover:bg-[#245548] disabled:opacity-60 sm:h-10 sm:w-auto" disabled={busy} type="submit">{busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{busy ? "Saving…" : "Save expense"}</button></div>
         </form>
       </section>
 
@@ -83,7 +83,24 @@ export default function ExpensesView() {
         {loading ? <div className="flex justify-center py-12"><LoaderCircle className="h-5 w-5 animate-spin text-[#71937c]" /></div>
           : error ? <div className="p-5"><InlineMessage message={error} /></div>
             : !data?.expenses.length ? <p className="px-5 py-12 text-center text-sm text-[#87958e]">No expenses recorded yet.</p>
-              : <div className="overflow-x-auto"><table className="w-full min-w-[850px] text-left">
+              : <>
+                <div className="divide-y divide-[#edf1ee] sm:hidden">
+                  {data.expenses.map((expense) => (
+                    <article className="space-y-3 p-4" key={expense._id}>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0"><p className="break-words text-sm font-semibold text-[#29483d]">{expense.category}</p><p className="mt-1 break-words text-xs text-[#8a9992]">{expense.payee}</p></div>
+                        <p className="shrink-0 text-sm font-semibold text-[#315444]">{formatRupees(expense.amountPaise)}</p>
+                      </div>
+                      <dl className="grid grid-cols-2 gap-x-3 gap-y-3 border-t border-[#f0f3f0] pt-3 text-xs">
+                        <div><dt className="text-[#91a098]">Date</dt><dd className="mt-1 text-[#73857b]">{localDate(expense.incurredAt)}</dd></div>
+                        <div><dt className="text-[#91a098]">Recorded by</dt><dd className="mt-1 break-words text-[#73857b]">{expense.createdBy?.name ?? "—"}</dd></div>
+                        <div className="col-span-2"><dt className="text-[#91a098]">Notes</dt><dd className="mt-1 break-words text-[#73857b]">{expense.notes || "—"}</dd></div>
+                        <div className="col-span-2 min-w-0"><dt className="text-[#91a098]">Receipt reference</dt><dd className="mt-1 break-all font-mono text-[#73857b]">{expense.receiptStorageRef || "—"}</dd></div>
+                      </dl>
+                    </article>
+                  ))}
+                </div>
+                <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[850px] text-left">
                 <thead className="bg-[#f8faf8] text-[10px] font-semibold uppercase tracking-[0.11em] text-[#87968e]"><tr><th className="px-5 py-3">Date</th><th className="px-5 py-3">Category / payee</th><th className="px-5 py-3">Amount</th><th className="px-5 py-3">Notes</th><th className="px-5 py-3">Receipt reference</th><th className="px-5 py-3">Recorded by</th></tr></thead>
                 <tbody className="divide-y divide-[#f0f3f0]">{data.expenses.map((expense) => <tr key={expense._id}>
                   <td className="px-5 py-4 text-xs text-[#73857b]">{localDate(expense.incurredAt)}</td>
@@ -93,7 +110,8 @@ export default function ExpensesView() {
                   <td className="px-5 py-4 font-mono text-[11px] text-[#73857b]">{expense.receiptStorageRef || "—"}</td>
                   <td className="px-5 py-4 text-xs text-[#73857b]">{expense.createdBy?.name ?? "—"}</td>
                 </tr>)}</tbody>
-              </table></div>}
+              </table></div>
+              </>}
       </section>
     </div>
   );

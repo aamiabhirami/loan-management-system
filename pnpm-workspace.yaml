@@ -1,2 +1,6 @@
-ignoredBuiltDependencies:
-  - bcrypt
+allowBuilds:
+  bcrypt: false
+  unrs-resolver: false
+permissions:
+  dotenv:
+    skills: false

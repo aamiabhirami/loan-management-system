@@ -34,7 +34,7 @@ export default async function DashboardPage() {
         description={`${roleLabel(actor.role)} workspace · Here’s your portfolio at a glance.`}
         action={
           <Link
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-[#173b33] px-4 text-sm font-medium text-white shadow-sm transition hover:bg-[#245548]"
+            className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#173b33] px-4 text-sm font-medium text-white shadow-sm transition hover:bg-[#245548] sm:h-10 sm:w-auto"
             href="/loans"
           >
             <BadgeIndianRupee className="h-4 w-4" />
@@ -45,14 +45,14 @@ export default async function DashboardPage() {
 
       {hasApprovals && (
         <Link
-          className="flex items-center justify-between rounded-xl border border-[#eedcae] bg-[#fffaf0] px-4 py-3 text-sm text-[#846523]"
+          className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#eedcae] bg-[#fffaf0] px-4 py-3 text-sm text-[#846523]"
           href="/loans?status=PENDING_APPROVAL"
         >
-          <span className="flex items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2">
             <Clock3 className="h-4 w-4" />
             {metrics.statusCounts.PENDING_APPROVAL} applications are waiting for review
           </span>
-          <span className="flex items-center gap-1 font-semibold">Review queue <ArrowUpRight className="h-4 w-4" /></span>
+          <span className="flex shrink-0 items-center gap-1 font-semibold">Review queue <ArrowUpRight className="h-4 w-4" /></span>
         </Link>
       )}
 

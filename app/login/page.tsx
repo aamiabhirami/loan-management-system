@@ -29,7 +29,7 @@ export default function LoginPage() {
         <p className="relative text-xs text-white/45">Built for the people who move communities forward.</p>
       </section>
 
-      <section className="flex min-h-screen items-center justify-center px-6 py-12">
+      <section className="flex min-h-screen items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
         <div className="w-full max-w-[420px]">
           <div className="mb-10 flex items-center gap-3 lg:hidden">
             <div className="grid h-10 w-10 place-items-center rounded-xl bg-[#173b33] font-bold text-[#c8f169]">M</div>
@@ -37,7 +37,7 @@ export default function LoginPage() {
           </div>
           <div className="mb-8">
             <p className="text-sm font-semibold text-[#57736a]">WELCOME BACK</p>
-            <h2 className="mt-2 text-3xl font-semibold tracking-tight text-[#132f29]">Sign in to Mitra</h2>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#132f29] sm:text-3xl">Sign in to Mitra</h2>
             <p className="mt-2 text-sm leading-6 text-[#71827d]">Use your organization account to continue.</p>
           </div>
           <LoginForm />

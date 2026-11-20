@@ -1,4 +1,5 @@
 export const MAX_CUSTOMER_DOCUMENT_BYTES = 10 * 1024 * 1024;
+export const MAX_CUSTOMER_DOCUMENT_IMAGE_INPUT_BYTES = 50 * 1024 * 1024;
 
 export function validateDocumentContent(mimeType: string, bytes: Uint8Array) {
   if (bytes.byteLength === 0 || bytes.byteLength > MAX_CUSTOMER_DOCUMENT_BYTES) {

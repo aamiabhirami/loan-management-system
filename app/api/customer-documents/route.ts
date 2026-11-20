@@ -1,26 +1,20 @@
 import mongoose from "mongoose";
-import {
-  apiFailure,
-  jsonError,
-  objectIdField,
-  stringField,
-} from "@/lib/api";
+import { apiFailure, jsonError, objectIdField, readJson, stringField } from "@/lib/api";
 import { recordAudit } from "@/lib/audit";
 import { canAccessBorrower, getAccessibleBorrowerIds, requireApiActor } from "@/lib/authz";
-import {
-  CloudinaryConfigurationError,
-  deleteCustomerDocument,
-  uploadCustomerDocument,
-} from "@/lib/cloudinary";
 import dbConnect from "@/lib/db";
 import { MAX_CUSTOMER_DOCUMENT_BYTES, validateDocumentContent } from "@/lib/document-validation";
+import { storageReferenceField } from "@/lib/storage-reference";
+import {
+  deleteCustomerDocumentBlob,
+  getCustomerDocumentBlob,
+  VercelBlobConfigurationError,
+} from "@/lib/vercel-blob";
 import { CUSTOMER_DOCUMENT_MIME_TYPES } from "@/models/CustomerDocument";
 import CustomerDocument from "@/models/CustomerDocument";
 import User from "@/models/User";
-import { randomUUID } from "node:crypto";
 
 const categories = ["IDENTITY", "ADDRESS", "INCOME", "OTHER"] as const;
-const MAX_REQUEST_BYTES = MAX_CUSTOMER_DOCUMENT_BYTES + 256 * 1024;
 
 export async function GET(request: Request) {
   const { actor, response } = await requireApiActor();
@@ -50,49 +44,57 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const { actor, response } = await requireApiActor();
   if (response) return response;
-  const contentLength = Number(request.headers.get("content-length"));
-  if (Number.isFinite(contentLength) && contentLength > MAX_REQUEST_BYTES) {
-    return jsonError("Upload must be no larger than 10 MB.", 413);
-  }
-  let formData: FormData;
-  try {
-    formData = await request.formData();
-  } catch {
-    return jsonError("Upload request must use valid multipart form data.");
-  }
 
   try {
-    const borrowerId = objectIdField(formData.get("customerId"), "Customer");
+    const { value, error } = await readJson(request);
+    if (error || !value) return jsonError(error ?? "Request body must be valid JSON.");
+    const borrowerId = objectIdField(value.customerId, "Customer");
     if (!(await canAccessBorrower(actor, borrowerId))) {
       return jsonError("You cannot add documents for this customer.", 403);
     }
-    const name = stringField(formData.get("name"), "Document name", 160);
-    const categoryValue = formData.get("category");
+    const name = stringField(value.name, "Document name", 160);
+    const categoryValue = value.category;
     if (typeof categoryValue !== "string" || !categories.includes(categoryValue as (typeof categories)[number])) {
       throw new TypeError("Choose a valid document category.");
     }
     const category = categoryValue as (typeof categories)[number];
-    const file = formData.get("file");
-    if (!(file instanceof File)) {
-      throw new TypeError("Choose a PDF, JPEG, or PNG document to upload.");
-    }
-    const mimeType = file.type;
-    if (!CUSTOMER_DOCUMENT_MIME_TYPES.includes(mimeType as (typeof CUSTOMER_DOCUMENT_MIME_TYPES)[number])) {
+    const mimeType = value.mimeType;
+    if (typeof mimeType !== "string"
+      || !CUSTOMER_DOCUMENT_MIME_TYPES.includes(mimeType as (typeof CUSTOMER_DOCUMENT_MIME_TYPES)[number])) {
       throw new TypeError("Documents must be PDF, JPEG, or PNG files.");
     }
-    if (!Number.isInteger(file.size) || file.size < 1 || file.size > MAX_CUSTOMER_DOCUMENT_BYTES) {
-      throw new TypeError("Choose a non-empty document no larger than 10 MB.");
+    const pathname = storageReferenceField(value.pathname, "Blob pathname");
+    if (!new RegExp(`^customer-documents/${borrowerId}/[0-9a-f-]{36}\\.(pdf|jpg|png)$`).test(pathname)) {
+      throw new TypeError("The uploaded file reference is invalid for this customer.");
     }
-    const bytes = Buffer.from(await file.arrayBuffer());
-    if (bytes.byteLength !== file.size) throw new TypeError("Uploaded file size could not be verified.");
-    validateDocumentContent(mimeType, bytes);
-    const sizeBytes = bytes.byteLength;
+    const expectedExtension = mimeType === "application/pdf" ? "pdf" : mimeType === "image/jpeg" ? "jpg" : "png";
+    if (!pathname.endsWith(`.${expectedExtension}`)) {
+      throw new TypeError("The uploaded file type does not match its storage reference.");
+    }
+    const requestedSize = value.sizeBytes;
+    if (typeof requestedSize !== "number" || !Number.isInteger(requestedSize)
+      || requestedSize < 1 || requestedSize > MAX_CUSTOMER_DOCUMENT_BYTES) {
+      throw new TypeError("The optimized document must be no larger than 10 MB.");
+    }
 
     await dbConnect();
     const customer = await User.findOne({ _id: borrowerId, role: "user", isActive: true }).select("_id");
     if (!customer) return jsonError("Active customer was not found.", 404);
-    const uploadId = randomUUID();
-    const cloudAsset = await uploadCustomerDocument(bytes, borrowerId, uploadId);
+    if (await CustomerDocument.exists({ storageRef: pathname })) {
+      return jsonError("This file has already been attached to a document.", 409);
+    }
+
+    const blob = await getCustomerDocumentBlob(pathname);
+    if (!blob || blob.statusCode !== 200 || !blob.stream) {
+      return jsonError("The uploaded file could not be found in private Vercel Blob storage.", 409);
+    }
+    const bytes = Buffer.from(await new Response(blob.stream).arrayBuffer());
+    if (bytes.byteLength !== requestedSize || blob.blob.size !== requestedSize || blob.blob.contentType !== mimeType) {
+      throw new TypeError("The uploaded file size or type could not be verified.");
+    }
+    validateDocumentContent(mimeType, bytes);
+    const sizeBytes = bytes.byteLength;
+
     const session = await mongoose.startSession();
     let documentId = "";
     try {
@@ -104,10 +106,7 @@ export async function POST(request: Request) {
             category,
             mimeType,
             sizeBytes,
-            cloudinaryPublicId: cloudAsset.public_id,
-            cloudinaryAssetId: cloudAsset.asset_id,
-            cloudinaryFormat: cloudAsset.format,
-            cloudinaryVersion: cloudAsset.version,
+            storageRef: pathname,
             createdBy: actor.id,
           }], { session });
           documentId = document._id.toString();
@@ -121,9 +120,11 @@ export async function POST(request: Request) {
         });
       } catch (caught) {
         try {
-          await deleteCustomerDocument(cloudAsset.public_id);
+          if (!(await CustomerDocument.exists({ storageRef: pathname }))) {
+            await deleteCustomerDocumentBlob(pathname);
+          }
         } catch (cleanupError) {
-          console.error("Cloudinary cleanup failed after customer document save error:", cleanupError);
+          console.error("Vercel Blob cleanup failed after customer document save error:", cleanupError);
         }
         throw caught;
       }
@@ -132,7 +133,7 @@ export async function POST(request: Request) {
     }
     return Response.json({ documentId }, { status: 201 });
   } catch (caught) {
-    if (caught instanceof CloudinaryConfigurationError) return jsonError(caught.message, 503);
+    if (caught instanceof VercelBlobConfigurationError) return jsonError(caught.message, 503);
     return apiFailure(caught);
   }
 }

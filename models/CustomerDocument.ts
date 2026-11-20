@@ -29,12 +29,13 @@ const CustomerDocumentSchema = new Schema<ICustomerDocument>({
   cloudinaryAssetId: { type: String, trim: true, maxlength: 100, immutable: true },
   cloudinaryFormat: { type: String, trim: true, maxlength: 20, immutable: true },
   cloudinaryVersion: { type: Number, min: 1, immutable: true },
-  storageRef: { type: String, trim: true, maxlength: 300 },
+  storageRef: { type: String, trim: true, maxlength: 300, immutable: true },
   createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   isActive: { type: Boolean, default: true, index: true },
 }, { timestamps: true, strict: "throw" });
 
 CustomerDocumentSchema.index({ borrower: 1, createdAt: -1 });
+CustomerDocumentSchema.index({ storageRef: 1 }, { unique: true, sparse: true });
 
 export default mongoose.models.CustomerDocument
   || mongoose.model<ICustomerDocument>("CustomerDocument", CustomerDocumentSchema);

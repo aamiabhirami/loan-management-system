@@ -20,12 +20,12 @@ export default function StatCard({
     blue: "bg-[#e9f1f7] text-[#4e7898]",
   };
   return (
-    <article className="rounded-2xl border border-[#e7ece8] bg-white p-5 shadow-[0_2px_8px_rgba(26,64,50,0.025)]">
+    <article className="min-w-0 rounded-2xl border border-[#e7ece8] bg-white p-4 shadow-[0_2px_8px_rgba(26,64,50,0.025)] sm:p-5">
       <div className="flex items-start justify-between">
         <p className="text-[13px] font-medium text-[#72847d]">{label}</p>
         <span className={`grid h-9 w-9 place-items-center rounded-xl ${colors[tone]}`}>{icon}</span>
       </div>
-      <p className="mt-3 text-[26px] font-semibold tracking-[-0.045em] text-[#193b32]">{value}</p>
+      <p className="mt-3 break-words text-[clamp(1.25rem,6vw,1.625rem)] font-semibold tracking-[-0.045em] text-[#193b32]">{value}</p>
       <p className="mt-1 text-xs text-[#87958f]">{detail}</p>
     </article>
   );

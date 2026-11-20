@@ -120,7 +120,7 @@ export default function PayrollView() {
           <label className="text-xs font-semibold text-[#526d61]">Earnings (label, rupees per line)<textarea className="form-control min-h-24" name="earnings" placeholder={"Base salary, 25000\nTravel allowance, 1500"} required /></label>
           <label className="text-xs font-semibold text-[#526d61]">Deductions (optional)<textarea className="form-control min-h-24" name="deductions" placeholder={"Advance recovery, 1000"} /></label>
           <label className="text-xs font-semibold text-[#526d61]">Notes (optional)<textarea className="form-control min-h-24" maxLength={1000} name="notes" /></label>
-          <div className="sm:col-span-2 xl:col-span-3"><button className="flex h-10 items-center justify-center gap-2 rounded-lg bg-[#173b33] px-4 text-sm font-semibold text-white hover:bg-[#245548] disabled:opacity-60" disabled={busy || employees.length === 0} type="submit">{busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{busy ? "Saving…" : "Create draft payroll"}</button>{employees.length === 0 && <p className="mt-2 text-xs text-[#9a7650]">Create an active director or field-manager account before recording payroll.</p>}</div>
+          <div className="sm:col-span-2 xl:col-span-3"><button className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#173b33] px-4 text-sm font-semibold text-white hover:bg-[#245548] disabled:opacity-60 sm:h-10 sm:w-auto" disabled={busy || employees.length === 0} type="submit">{busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{busy ? "Saving…" : "Create draft payroll"}</button>{employees.length === 0 && <p className="mt-2 text-xs text-[#9a7650]">Create an active director or field-manager account before recording payroll.</p>}</div>
         </form>
       </section>
 
@@ -130,20 +130,39 @@ export default function PayrollView() {
           <div><h2 className="text-sm font-semibold text-[#24463a]">Payroll report</h2><p className="mt-1 text-xs text-[#8a9992]">Totals for records starting in the selected month.</p></div>
           <label className="text-xs font-semibold text-[#526d61]">Report month<input className="form-control mt-1" onChange={(event) => setMonth(event.target.value)} type="month" value={month} /></label>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-3 xl:grid-cols-5">
           {[
             ["Gross", data?.totals.grossPaise ?? 0],
             ["Deductions", data?.totals.deductionsPaise ?? 0],
             ["Net", data?.totals.netPaise ?? 0],
             ["Paid", data?.totals.paidPaise ?? 0],
             ["Draft", data?.totals.draftPaise ?? 0],
-          ].map(([label, amount]) => <div className="rounded-xl border border-[#e7ece8] bg-white p-4" key={label}><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#87968e]">{label}</p><p className="mt-2 text-lg font-semibold text-[#315444]">{formatRupees(Number(amount))}</p></div>)}
+          ].map(([label, amount]) => <div className="min-w-0 rounded-xl border border-[#e7ece8] bg-white p-3 sm:p-4" key={label}><p className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#87968e]">{label}</p><p className="mt-2 break-words text-sm font-semibold text-[#315444] sm:text-lg">{formatRupees(Number(amount))}</p></div>)}
         </div>
         <div className="overflow-hidden rounded-2xl border border-[#e7ece8] bg-white">
           {loading ? <div className="flex justify-center py-12"><LoaderCircle className="h-5 w-5 animate-spin text-[#71937c]" /></div>
             : error ? <div className="p-5"><InlineMessage message={error} /></div>
               : !data?.records.length ? <p className="px-5 py-12 text-center text-sm text-[#87958e]">No payroll records for {month}.</p>
-                : <div className="overflow-x-auto"><table className="w-full min-w-[900px] text-left">
+                : <>
+                  <div className="divide-y divide-[#edf1ee] sm:hidden">
+                    {data.records.map((record) => (
+                      <article className="space-y-3 p-4" key={record._id}>
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0"><p className="break-words text-sm font-semibold text-[#29483d]">{record.employee.name}</p><p className="mt-1 text-xs text-[#8a9992]">{roleLabel(record.employee.role)}</p></div>
+                          <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${record.status === "PAID" ? "bg-[#eaf4ed] text-[#397253]" : "bg-[#fff4df] text-[#8d7041]"}`}>{record.status.toLowerCase()}</span>
+                        </div>
+                        <dl className="grid grid-cols-2 gap-x-3 gap-y-3 border-t border-[#f0f3f0] pt-3 text-xs">
+                          <div className="col-span-2"><dt className="text-[#91a098]">Pay period</dt><dd className="mt-1 text-[#73857b]">{shortDate(record.periodStart)} – {shortDate(record.periodEnd)}</dd></div>
+                          <div><dt className="text-[#91a098]">Earnings</dt><dd className="mt-1 break-words text-[#73857b]">{formatRupees(record.grossPaise)}</dd></div>
+                          <div><dt className="text-[#91a098]">Deductions</dt><dd className="mt-1 break-words text-[#73857b]">{formatRupees(record.deductionsPaise)}</dd></div>
+                          <div><dt className="text-[#91a098]">Net pay</dt><dd className="mt-1 break-words font-semibold text-[#315444]">{formatRupees(record.netPaise)}</dd></div>
+                          {record.paidAt && <div><dt className="text-[#91a098]">Paid on</dt><dd className="mt-1 text-[#73857b]">{shortDate(record.paidAt)}</dd></div>}
+                        </dl>
+                        {record.status === "DRAFT" && <button className="min-h-11 w-full rounded-lg border border-[#dfe9e2] px-3 text-sm font-semibold text-[#668272] hover:bg-[#f5f8f5] disabled:opacity-50" disabled={busyId === record._id} onClick={() => markPaid(record)} type="button">{busyId === record._id ? "Saving…" : "Mark paid"}</button>}
+                      </article>
+                    ))}
+                  </div>
+                  <div className="hidden overflow-x-auto sm:block"><table className="w-full min-w-[900px] text-left">
                   <thead className="bg-[#f8faf8] text-[10px] font-semibold uppercase tracking-[0.11em] text-[#87968e]"><tr><th className="px-5 py-3">Employee</th><th className="px-5 py-3">Pay period</th><th className="px-5 py-3">Earnings</th><th className="px-5 py-3">Deductions</th><th className="px-5 py-3">Net pay</th><th className="px-5 py-3">Status</th><th className="px-5 py-3">Action</th></tr></thead>
                   <tbody className="divide-y divide-[#f0f3f0]">{data.records.map((record) => <tr key={record._id}>
                     <td className="px-5 py-4"><p className="text-sm font-medium text-[#29483d]">{record.employee.name}</p><p className="mt-1 text-xs text-[#8a9992]">{roleLabel(record.employee.role)}</p></td>
@@ -154,7 +173,8 @@ export default function PayrollView() {
                     <td className="px-5 py-4"><span className={`rounded-full px-2 py-1 text-[10px] font-semibold ${record.status === "PAID" ? "bg-[#eaf4ed] text-[#397253]" : "bg-[#fff4df] text-[#8d7041]"}`}>{record.status.toLowerCase()}</span>{record.paidAt && <p className="mt-1 text-[10px] text-[#8a9992]">{shortDate(record.paidAt)}</p>}</td>
                     <td className="px-5 py-4">{record.status === "DRAFT" && <button className="text-xs font-semibold text-[#668272] hover:text-[#274c38] disabled:opacity-50" disabled={busyId === record._id} onClick={() => markPaid(record)} type="button">{busyId === record._id ? "Saving…" : "Mark paid"}</button>}</td>
                   </tr>)}</tbody>
-                </table></div>}
+                </table></div>
+                </>}
         </div>
       </section>
     </div>
