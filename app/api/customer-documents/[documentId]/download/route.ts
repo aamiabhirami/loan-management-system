@@ -14,10 +14,11 @@ import CustomerDocument from "@/models/CustomerDocument";
 
 type RouteContext = { params: Promise<{ documentId: string }> };
 
-export async function GET(_request: Request, { params }: RouteContext) {
+export async function GET(request: Request, { params }: RouteContext) {
   const { actor, response } = await requireApiActor();
   if (response) return response;
   try {
+    const inline = new URL(request.url).searchParams.get("inline") === "1";
     const { documentId } = await params;
     if (!mongoose.isValidObjectId(documentId)) return jsonError("Document identifier is invalid.");
     await dbConnect();
@@ -25,7 +26,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
       .select("borrower name mimeType storageRef cloudinaryPublicId cloudinaryFormat");
     if (!document) return jsonError("Document not found.", 404);
     if (!(await canAccessBorrower(actor, document.borrower.toString()))) {
-      return jsonError("You cannot download documents for this customer.", 403);
+      return jsonError("You cannot access documents for this customer.", 403);
     }
     if (document.storageRef) {
       const blob = await getCustomerDocumentBlob(document.storageRef);
@@ -38,7 +39,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
       return new Response(blob.stream, {
         headers: {
           "Cache-Control": "private, no-store",
-          "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(`${document.name}.${extension}`)}`,
+          "Content-Disposition": `${inline ? "inline" : "attachment"}; filename*=UTF-8''${encodeURIComponent(`${document.name}.${extension}`)}`,
           "Content-Type": document.mimeType,
           "Referrer-Policy": "no-referrer",
           "X-Content-Type-Options": "nosniff",
@@ -51,6 +52,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
     const downloadUrl = createCustomerDocumentDownloadUrl(
       document.cloudinaryPublicId,
       document.cloudinaryFormat,
+      inline,
     );
     const redirect = Response.redirect(downloadUrl, 302);
     redirect.headers.set("Cache-Control", "private, no-store");

@@ -1,6 +1,7 @@
 "use client";
 
-import { LoaderCircle, Plus, Trash2 } from "lucide-react";
+import { Eye, LoaderCircle, Plus, Trash2, X } from "lucide-react";
+import Image from "next/image";
 import { useState, type FormEvent } from "react";
 import InlineMessage from "@/components/inline-message";
 import { useResource } from "@/components/use-resource";
@@ -29,6 +30,10 @@ const categoryLabels: Record<string, string> = {
   OTHER: "Other",
 };
 
+function customerDocumentUrl(documentId: string, inline = false) {
+  return `/api/customer-documents/${documentId}/download${inline ? "?inline=1" : ""}`;
+}
+
 export default function CustomerDocumentsView() {
   const { data: usersData } = useResource<{ users: CustomerRow[] }>("/api/users");
   const customers = (usersData?.users ?? []).filter((user) => user.role === "user");
@@ -41,6 +46,7 @@ export default function CustomerDocumentsView() {
   const [busyId, setBusyId] = useState("");
   const [failure, setFailure] = useState("");
   const [feedback, setFeedback] = useState("");
+  const [viewingDocument, setViewingDocument] = useState<DocumentRow | null>(null);
 
   async function addDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -150,7 +156,7 @@ export default function CustomerDocumentsView() {
           <label className="text-xs font-semibold text-[#526d61]">Category<select className="form-control" name="category" required><option value="IDENTITY">Identity</option><option value="ADDRESS">Address</option><option value="INCOME">Income</option><option value="OTHER">Other</option></select></label>
           <label className="text-xs font-semibold text-[#526d61]">Choose file<input className="form-control file:mr-3 file:border-0 file:bg-transparent file:text-xs" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png" name="file" required type="file" /></label>
           <div className="flex items-end"><button className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#173b33] px-4 text-sm font-semibold text-white hover:bg-[#245548] disabled:opacity-60 sm:h-10" disabled={busy} type="submit">{busy && <LoaderCircle className="h-4 w-4 animate-spin" />}{busy ? "Optimizing & uploading…" : "Upload document"}</button></div>
-          <p className="sm:col-span-2 xl:col-span-3 text-[11px] leading-5 text-[#85938c]">Allowed types: PDF, JPEG, PNG. Images up to 50 MB are resized to 2,800 px at moderate quality; PDFs are losslessly optimized without rasterizing pages. Optimized files must be no larger than 10 MB. Uploads are private; downloads require an authorized sign-in.</p>
+          <p className="sm:col-span-2 xl:col-span-3 text-[11px] leading-5 text-[#85938c]">Allowed types: PDF, JPEG, PNG. Images up to 50 MB are resized to 2,800 px at moderate quality; PDFs are losslessly optimized without rasterizing pages. Optimized files must be no larger than 10 MB. Uploads are private; viewing and downloading require an authorized sign-in.</p>
         </form>
       </section>}
 
@@ -170,8 +176,9 @@ export default function CustomerDocumentsView() {
                         <div><dt className="text-[#91a098]">File</dt><dd className="mt-1 text-[#73857b]">{document.mimeType.split("/")[1].toUpperCase()} · {(document.sizeBytes / (1024 * 1024)).toFixed(2)} MB</dd></div>
                         <div className="col-span-2"><dt className="text-[#91a098]">Uploaded</dt><dd className="mt-1 text-[#73857b]">{new Date(document.createdAt).toLocaleDateString("en-IN", { timeZone: "UTC" })}</dd></div>
                       </dl>
-                      <div className="flex items-center gap-4 border-t border-[#f0f3f0] pt-3">
-                        <a className="inline-flex min-h-11 items-center text-sm font-semibold text-[#4b8062] hover:underline" href={`/api/customer-documents/${document._id}/download`}>Download</a>
+                      <div className="flex flex-wrap items-center gap-4 border-t border-[#f0f3f0] pt-3">
+                        <button aria-label={`View ${document.name}`} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#4b8062] hover:underline" onClick={() => setViewingDocument(document)} type="button"><Eye className="h-4 w-4" />View</button>
+                        <a className="inline-flex min-h-11 items-center text-sm font-semibold text-[#4b8062] hover:underline" href={customerDocumentUrl(document._id)}>Download</a>
                         <button aria-label={`Remove ${document.name}`} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-[#9f5f52] hover:text-red-700 disabled:opacity-50" disabled={busyId === document._id} onClick={() => removeDocument(document)} type="button"><Trash2 className="h-4 w-4" />Remove</button>
                       </div>
                     </article>
@@ -184,11 +191,34 @@ export default function CustomerDocumentsView() {
                   <td className="px-5 py-4"><p className="text-sm font-medium text-[#29483d]">{document.name}</p><p className="mt-1 text-[10px] text-[#8a9992]">{new Date(document.createdAt).toLocaleDateString("en-IN", { timeZone: "UTC" })}</p></td>
                   <td className="px-5 py-4 text-xs text-[#73857b]">{categoryLabels[document.category] ?? document.category} · {document.mimeType.split("/")[1].toUpperCase()}</td>
                   <td className="px-5 py-4 text-xs text-[#73857b]">{(document.sizeBytes / (1024 * 1024)).toFixed(2)} MB</td>
-                  <td className="space-x-3 px-5 py-4"><a className="text-xs font-semibold text-[#4b8062] hover:underline" href={`/api/customer-documents/${document._id}/download`}>Download</a><button aria-label={`Remove ${document.name}`} className="inline-flex items-center text-[#9f5f52] hover:text-red-700 disabled:opacity-50" disabled={busyId === document._id} onClick={() => removeDocument(document)} type="button"><Trash2 className="h-4 w-4" /></button></td>
+                  <td className="space-x-3 px-5 py-4"><button className="inline-flex items-center gap-1 text-xs font-semibold text-[#4b8062] hover:underline" onClick={() => setViewingDocument(document)} type="button"><Eye className="h-3.5 w-3.5" />View</button><a className="text-xs font-semibold text-[#4b8062] hover:underline" href={customerDocumentUrl(document._id)}>Download</a><button aria-label={`Remove ${document.name}`} className="inline-flex items-center text-[#9f5f52] hover:text-red-700 disabled:opacity-50" disabled={busyId === document._id} onClick={() => removeDocument(document)} type="button"><Trash2 className="h-4 w-4" /></button></td>
                 </tr>)}</tbody>
               </table></div>
               </>}
       </section>
+      {viewingDocument && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#14251f]/70 p-2 sm:p-4" role="presentation">
+          <section aria-labelledby="customer-document-preview-title" aria-modal="true" className="flex h-[90dvh] max-h-[60rem] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-[#dfe9e2] bg-white shadow-2xl" role="dialog">
+            <header className="flex shrink-0 items-center justify-between gap-3 border-b border-[#edf1ee] px-4 py-3 sm:px-5">
+              <div className="min-w-0">
+                <h2 className="truncate text-sm font-semibold text-[#24463a]" id="customer-document-preview-title">{viewingDocument.name}</h2>
+                <p className="mt-1 text-xs text-[#8a9992]">{viewingDocument.borrower.name} · {viewingDocument.mimeType.split("/")[1].toUpperCase()}</p>
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <a className="inline-flex h-9 items-center rounded-lg border border-[#dfe9e2] px-3 text-xs font-semibold text-[#4b8062] hover:bg-[#f5f8f5]" href={customerDocumentUrl(viewingDocument._id)}>Download</a>
+                <button aria-label="Close document preview" className="grid size-9 place-items-center rounded-lg text-[#73857b] hover:bg-[#f1f6f2]" onClick={() => setViewingDocument(null)} type="button"><X className="h-4 w-4" /></button>
+              </div>
+            </header>
+            <div className="relative min-h-0 flex-1 bg-[#f4f6f4]">
+              {viewingDocument.mimeType.startsWith("image/") ? (
+                <Image alt={viewingDocument.name} className="object-contain" fill referrerPolicy="no-referrer" sizes="100vw" src={customerDocumentUrl(viewingDocument._id, true)} unoptimized />
+              ) : (
+                <iframe className="h-full w-full border-0" referrerPolicy="no-referrer" src={customerDocumentUrl(viewingDocument._id, true)} title={`Preview of ${viewingDocument.name}`} />
+              )}
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

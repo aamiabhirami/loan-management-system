@@ -56,12 +56,12 @@ export async function deleteCustomerDocument(publicId: string) {
   }
 }
 
-export function createCustomerDocumentDownloadUrl(publicId: string, format: string) {
+export function createCustomerDocumentDownloadUrl(publicId: string, format: string, inline = false) {
   const client = getCloudinary();
   return client.utils.private_download_url(publicId, format, {
     resource_type: "image",
     type: "authenticated",
     expires_at: Math.floor(Date.now() / 1000) + 60,
-    attachment: true,
+    attachment: !inline,
   });
 }
