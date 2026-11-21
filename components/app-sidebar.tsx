@@ -96,7 +96,7 @@ export default function AppSidebar({ role }: SidebarProps) {
       <aside id="main-navigation" className={`fixed inset-y-0 left-0 z-40 w-[min(84vw,280px)] flex-col bg-[#102f2a] text-white transition-transform md:w-[76px] xl:w-[244px] ${
         mobileOpen ? "flex translate-x-0" : "hidden -translate-x-full md:flex md:translate-x-0"
       }`}>
-        <Link href="/dashboard" onClick={() => setMobileOpen(false)} className="flex h-16 shrink-0 items-center justify-start gap-3 border-b border-white/[0.08] px-5 sm:h-[76px] md:justify-center xl:justify-start">
+        <Link href="/dashboard" onClick={() => setMobileOpen(false)} prefetch={false} className="flex h-16 shrink-0 items-center justify-start gap-3 border-b border-white/[0.08] px-5 sm:h-[76px] md:justify-center xl:justify-start">
           <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#c8f169] text-sm font-bold text-[#17362f]">M</span>
           <span className="text-lg font-semibold tracking-tight md:hidden xl:block">mitra</span>
         </Link>
@@ -124,6 +124,7 @@ export default function AppSidebar({ role }: SidebarProps) {
                         href={href}
                         key={href}
                         onClick={() => setMobileOpen(false)}
+                        prefetch={href !== "/dashboard"}
                         title={label}
                       >
                         <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={1.8} />

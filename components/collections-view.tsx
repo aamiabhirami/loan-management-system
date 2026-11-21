@@ -30,7 +30,7 @@ function rupees(paise: number) {
 }
 
 export default function CollectionsView({ role }: { role: UserRole }) {
-  const { data: loanData, loading: loansLoading, error: loansError } = useResource<{ loans: Loan[] }>("/api/loans");
+  const { data: loanData, loading: loansLoading, error: loansError, reload: reloadLoans } = useResource<{ loans: Loan[] }>("/api/loans");
   const { data, loading, error, reload } = useResource<{ collections: Collection[] }>("/api/collections");
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState("");
@@ -64,7 +64,7 @@ export default function CollectionsView({ role }: { role: UserRole }) {
       if (!response.ok) throw new Error(result.error ?? "Collection could not be recorded.");
       form.reset();
       setReceipt(result.receiptCode ?? "");
-      await Promise.all([reload()]);
+      await Promise.all([reload(), reloadLoans()]);
     } catch (caught) {
       setFailure(caught instanceof Error ? caught.message : "Collection could not be recorded.");
     } finally {
@@ -76,7 +76,7 @@ export default function CollectionsView({ role }: { role: UserRole }) {
     <div className="space-y-5">
       {role !== "user" && (
         <section className="rounded-2xl border border-[#dfe9e2] bg-white p-5">
-          <div className="mb-4 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#eaf4ed] text-[#4b7c58]"><Banknote className="h-4 w-4" /></span><div><h2 className="text-sm font-semibold text-[#24463a]">Record a field collection</h2><p className="mt-1 text-xs text-[#8a9992]">Apply a collection to due installments in date order</p></div></div>
+          <div className="mb-4 flex items-center gap-3"><span className="grid h-9 w-9 place-items-center rounded-xl bg-[#eaf4ed] text-[#4b7c58]"><Banknote className="h-4 w-4" /></span><div><h2 className="text-sm font-semibold text-[#24463a]">Record a field collection</h2><p className="mt-1 text-xs text-[#8a9992]">Applied to the oldest due installment first; unpaid amounts remain overdue</p></div></div>
           {failure && <div className="mb-4"><InlineMessage message={failure} /></div>}
           {receipt && <div className="mb-4"><InlineMessage message={`Collection recorded. Receipt ${receipt} is ready. Notification adapter is in sandbox mode.`} tone="success" /></div>}
           <form className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5" onSubmit={submit}>

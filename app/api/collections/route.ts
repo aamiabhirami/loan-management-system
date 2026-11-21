@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import mongoose from "mongoose";
+import { revalidatePath } from "next/cache";
 import {
   apiFailure,
   jsonError,
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
         || duplicate.amountPaise !== amountPaise) {
         return jsonError("This request key was already used for a different collection.", 409);
       }
+      revalidatePath("/dashboard");
       return Response.json({ collection: duplicate, replayed: true });
     }
 
@@ -194,6 +196,7 @@ export async function POST(request: Request) {
       await session.endSession();
     }
 
+    revalidatePath("/dashboard");
     const borrower = await User.findById(existingLoan.borrower).select("phone").lean();
     const notification = await sendCollectionReceipt({ receiptCode, phone: borrower?.phone });
     return Response.json({
