@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, LoaderCircle, Pencil, Plus, Search, Trash2, UserRoundPlus, X } from "lucide-react";
+import { Eye, KeyRound, LoaderCircle, Pencil, Plus, Search, Trash2, UserRoundPlus, X } from "lucide-react";
 import { useMemo, useState, type FormEvent } from "react";
 import InlineMessage from "@/components/inline-message";
 import { useResource } from "@/components/use-resource";
@@ -45,6 +45,9 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
   const [busy, setBusy] = useState(false);
   const [busyId, setBusyId] = useState("");
   const [kycBusyId, setKycBusyId] = useState("");
+  const [resettingUser, setResettingUser] = useState<UserRow | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetFailure, setResetFailure] = useState("");
   const [feedback, setFeedback] = useState("");
   const [failure, setFailure] = useState("");
   const [selectedCustomer, setSelectedCustomer] = useState<UserRow | null>(null);
@@ -108,6 +111,41 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
       setFailure(caught instanceof Error ? caught.message : "Account could not be updated.");
     } finally {
       setBusyId("");
+    }
+  }
+
+  async function resetUserPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!resettingUser) return;
+    const values = new FormData(event.currentTarget);
+    const passwordValue = values.get("password");
+    const confirmation = values.get("confirmPassword");
+    if (typeof passwordValue !== "string" || typeof confirmation !== "string") {
+      setResetFailure("Enter and confirm the temporary password.");
+      return;
+    }
+    const password = passwordValue.trim();
+    if (password.length < 12) {
+      setResetFailure("Temporary password must contain at least 12 characters.");
+      return;
+    }
+    if (password !== confirmation.trim()) {
+      setResetFailure("The passwords do not match.");
+      return;
+    }
+
+    setResetBusy(true);
+    setResetFailure("");
+    setFailure("");
+    setFeedback("");
+    try {
+      await request(`/api/users/${resettingUser._id}/reset-password`, "POST", { password });
+      setFeedback(`${resettingUser.name}'s password was reset. Share the temporary password securely.`);
+      setResettingUser(null);
+    } catch (caught) {
+      setResetFailure(caught instanceof Error ? caught.message : "The password could not be reset.");
+    } finally {
+      setResetBusy(false);
     }
   }
 
@@ -215,6 +253,7 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
         <button aria-label={`Edit ${user.name}`} className="grid min-h-11 min-w-11 place-items-center rounded-md text-[#668272] hover:bg-[#f1f6f2] hover:text-[#274c38]" onClick={() => openCustomer(user, true)} title="Edit customer" type="button"><Pencil className="size-4" /></button>
         <button aria-label={`Delete ${user.name}`} className="grid min-h-11 min-w-11 place-items-center rounded-md text-[#a34343] hover:bg-[#fbefed]" onClick={() => { void openCustomer(user, false, true); }} title="Delete customer" type="button"><Trash2 className="size-4" /></button>
       </>}
+      {isOrganizationAdmin(role) && <button aria-label={`Reset password for ${user.name}`} className="inline-flex min-h-11 items-center gap-1 px-2 text-xs font-semibold text-[#668272] hover:text-[#274c38]" onClick={() => { setResetFailure(""); setResettingUser(user); }} title="Reset password" type="button"><KeyRound className="size-4" /><span>Reset password</span></button>}
       <button className="min-h-11 px-2 text-xs font-semibold text-[#668272] hover:text-[#274c38] disabled:opacity-50" disabled={busyId === user._id} onClick={() => toggleActive(user)} type="button">{busyId === user._id ? "Saving…" : user.isActive ? "Deactivate" : "Reactivate"}</button>
     </div>
   );
@@ -349,6 +388,31 @@ export default function CustomersView({ role, teamMode = false }: { role: UserRo
                 {confirmDelete ? <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#edf1ee] pt-4"><p className="text-xs text-[#9f463f]">Permanently delete this customer? Linked records will prevent deletion.</p><div className="flex gap-2"><button className="h-9 rounded-lg border border-[#dfe9e2] px-3 text-xs font-semibold text-[#526d61]" onClick={() => setConfirmDelete(false)} type="button">Cancel</button><button className="h-9 rounded-lg bg-[#a34343] px-3 text-xs font-semibold text-white disabled:opacity-60" disabled={detailBusy} onClick={() => { void deleteCustomer(); }} type="button">{detailBusy ? "Deleting…" : "Delete customer"}</button></div></div> : <div className="flex justify-end gap-2 border-t border-[#edf1ee] pt-4"><button className="h-9 rounded-lg border border-[#dfe9e2] px-3 text-xs font-semibold text-[#a34343]" onClick={() => setConfirmDelete(true)} type="button"><Trash2 className="mr-1 inline size-3.5" />Delete</button><button className="h-9 rounded-lg bg-[#173b33] px-3 text-xs font-semibold text-white" onClick={() => setEditingCustomer(true)} type="button"><Pencil className="mr-1 inline size-3.5" />Edit customer</button></div>}
               </div>
             )}
+          </section>
+        </div>
+      )}
+
+      {resettingUser && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-[#14251f]/45 p-2 sm:p-4" role="presentation">
+          <section aria-labelledby="reset-password-title" aria-modal="true" className="w-full max-w-lg overflow-hidden rounded-xl border border-[#dfe9e2] bg-white shadow-2xl" role="dialog">
+            <header className="flex items-start justify-between gap-3 border-b border-[#edf1ee] px-4 py-4 sm:px-5">
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[#829189]">Account security</p>
+                <h2 className="mt-1 text-lg font-semibold text-[#24463a]" id="reset-password-title">Reset password</h2>
+                <p className="mt-1 text-xs text-[#8a9992]">{resettingUser.name} · {resettingUser.email}</p>
+              </div>
+              <button aria-label="Close password reset" className="grid size-8 place-items-center rounded-md text-[#73857b] hover:bg-[#f1f6f2] disabled:opacity-50" disabled={resetBusy} onClick={() => { setResettingUser(null); setResetFailure(""); }} type="button"><X className="size-4" /></button>
+            </header>
+            <form className="space-y-4 p-5" onSubmit={resetUserPassword}>
+              <label className="block text-xs font-semibold text-[#526d61]">Temporary password<input autoComplete="new-password" className="form-control" maxLength={128} minLength={12} name="password" required type="password" /></label>
+              <label className="block text-xs font-semibold text-[#526d61]">Confirm temporary password<input autoComplete="new-password" className="form-control" maxLength={128} minLength={12} name="confirmPassword" required type="password" /></label>
+              <p className="text-[11px] leading-5 text-[#85938c]">Use at least 12 characters and share the temporary password securely. The user can change it in Account settings.</p>
+              {resetFailure && <InlineMessage message={resetFailure} />}
+              <div className="flex justify-end gap-2 border-t border-[#edf1ee] pt-4">
+                <button className="h-9 rounded-lg border border-[#dfe9e2] px-3 text-xs font-semibold text-[#526d61] disabled:opacity-50" disabled={resetBusy} onClick={() => { setResettingUser(null); setResetFailure(""); }} type="button">Cancel</button>
+                <button className="flex h-9 items-center gap-2 rounded-lg bg-[#173b33] px-4 text-xs font-semibold text-white disabled:opacity-60" disabled={resetBusy} type="submit">{resetBusy && <LoaderCircle className="size-4 animate-spin" />}{resetBusy ? "Resetting…" : "Reset password"}</button>
+              </div>
+            </form>
           </section>
         </div>
       )}

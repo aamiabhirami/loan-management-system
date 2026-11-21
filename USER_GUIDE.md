@@ -85,6 +85,7 @@ Administrators can also create accounts from **Customers** using the **Access ro
 When editing a customer, administrators can change the same **Access role**. Changing to a non-customer role moves the account to **Team access** and clears its field-manager assignment.
 
 Search the account list by name or email. Use the KYC review selector to track **Not started**, **Pending**, **Verified**, or **Rejected**. This is a status field, not a document-verification or KYC provider integration. **Deactivate** prevents access; **Reactivate** restores access.
+Organization administrators can select **Reset password** on an account, enter a temporary password of at least 12 characters, and securely share it with the user. Password resets are recorded in the audit trail.
 
 ### 4.3 Review and decide loan applications
 
