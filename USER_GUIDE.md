@@ -38,7 +38,7 @@ All roles can open **Account settings** to update their name, phone, and address
 | --- | --- |
 | **Customer** (`user`) | View their own dashboard, applications/loans, and receipts; apply for a loan for themselves; provide consent for a pending application's sandbox credit inquiry; manage their profile. |
 | **Field manager** (`privileged`) | View their assigned customers and the loans, groups, and collections in their scope; create customer accounts assigned to themselves; create and service applications for assigned customers; organize their groups; review portfolio reports; manage their profile. |
-| **Administrator** (`admin`), **Director** (`director`), **Shareholder** (`shareholder`) | Organization-wide administrator access, including account and assignment management, products, groups, loan decisions and sandbox disbursement; expenses, payroll, customer-document references, portfolio information, and audit trail. |
+| **Administrator** (`admin`), **Director** (`director`), **Shareholder** (`shareholder`) | Organization-wide administrator access, including account and assignment management, products, groups, loan decisions and disbursement confirmation; expenses, payroll, customer-document references, portfolio information, and audit trail. |
 
 Access restrictions are enforced by the server as well as the navigation. A field manager cannot browse another manager's assigned customers. Customers cannot access administrative screens or another customer's records. Inactive accounts cannot sign in.
 
@@ -97,15 +97,15 @@ For a pending application, verify the required supporting evidence and policy ou
 2. The application must pass the product's debt-to-income affordability limit.
 3. Select **Approve** only when authorized and all lender checks are complete. An application over the configured affordability limit cannot be approved.
 4. Select **Decline** to reject it; enter a reason when prompted.
-5. For an approved application in a non-production environment, **Disburse** records a sandbox disbursement and creates the repayment schedule. It does not transfer funds.
+5. For an approved application in a non-production environment, **Disburse** records a sandbox disbursement and creates the repayment schedule. It does not transfer funds. In production, **Confirm disbursement** requires confirmation that funds have already been transferred outside the application; it creates the repayment schedule and activates the loan but does not initiate a transfer.
 
-If consent or a credit check is missing, the borrower must sign in and submit **Consent + check** for that application; staff cannot provide consent on the borrower's behalf. When an application passes affordability but has no usable bureau check, an administrator may choose **Approve without bureau check** and must provide a reason. This override is recorded in the audit trail and does not bypass the affordability limit. Live disbursement is not configured in production.
+If consent or a credit check is missing, the borrower must sign in and submit **Consent + check** for that application; staff cannot provide consent on the borrower's behalf. When an application passes affordability but has no usable bureau check, an administrator may choose **Approve without bureau check** and must provide a reason. This override is recorded in the audit trail and does not bypass the affordability limit. The application does not currently integrate with a live money-transfer provider.
 
 The lifecycle shown in the loan list includes pending approval, approved, active, and rejected states. The repayment schedule is generated at disbursement using the product's reducing-balance policy.
 
 ### 4.4 Manage groups, servicing, and oversight
 
-- In **JLG groups**, create a group with a name, center, optional meeting day, a field manager, and 2–30 customers. Activate or deactivate a group as its operational use changes.
+- In **JLG groups**, create, view, edit, activate/deactivate, or delete a group. Its overview shows each member's disbursed principal, repayments, and unpaid installments, plus group repayment health based on amounts repaid against installments due to date on active loans (healthy at 90%+, needs attention at 75–89%, and at risk below 75%). Groups with loan applications cannot be deleted; deactivate them instead.
 - In **Collections**, review organization-scope receipts. Administrators can record collections just like field managers.
 - In **Portfolio reports**, review outstanding principal, PAR 30/60/90+ values, monthly collections, and loan status charts.
 - In **Audit trail**, review the latest 100 operational events, their actor, affected record, metadata, and recorded time.
@@ -128,7 +128,7 @@ Use the KYC review selector to track operational status and deactivate/reactivat
 
 ### 5.2 Create a JLG group
 
-In **JLG groups**, choose **New group**, enter a group name and center, optionally choose a meeting day, and select 2–30 customers in your access scope. Create the group, then use its status action to deactivate or reactivate it. An administrator assigns field managers when creating groups; a field manager creates groups within their own scope.
+In **JLG groups**, choose **New group**, enter a group name and center, optionally choose a meeting day, and select 2–30 customers in your access scope. Use **View overview** to review member loan and repayment totals and the group's repayment health, or **Edit** to update the group. Groups with loan applications cannot be deleted; deactivate them instead. An administrator assigns field managers when creating groups; a field manager creates groups within their own scope.
 
 ### 5.3 Submit a customer's loan application
 
@@ -177,7 +177,7 @@ Open **Customer documents** to upload and view your PDF, JPEG, or PNG files. Use
 3. Mitra validates product bounds and calculates an affordability ratio from self-declared income/debt plus this organization's active obligations.
 4. The application waits for review. The borrower records explicit consent for the sandbox inquiry.
 5. An administrator may approve only after the recorded consent/check and a passed affordability gate. The administrator may decline a pending application with a reason.
-6. In non-production, an administrator can run sandbox disbursement on an approved application. Mitra creates the reducing-balance schedule and marks the loan active; no money moves.
+6. In non-production, an administrator can run sandbox disbursement on an approved application. In production, an administrator can confirm that funds have already been transferred manually. Mitra creates the reducing-balance schedule and marks the loan active; the application does not transfer funds.
 7. A field manager or administrator records collections against an active loan. Mitra allocates the received amount to due installments by date, and a receipt is available for printing.
 8. Dashboard/report metrics and audit entries update as servicing actions are recorded.
 
@@ -204,7 +204,7 @@ Administrators can review the latest 100 recorded operational events. Applicatio
 ## 9. Important operating limits
 
 - **Credit bureau:** the current adapter is sandbox-only. It produces no bureau report and must not support real lending decisions.
-- **Disbursement:** sandbox disbursement records no transfer. Live disbursement is not configured; the application disables sandbox disbursement in production.
+- **Disbursement:** sandbox disbursement records no transfer. Production activation requires administrator confirmation of a manual transfer; the application has no live money-transfer integration.
 - **Collections:** field capture requires connectivity. The notification adapter is sandbox-only; SMS, payment rails, offline synchronization, and Bluetooth printers are not enabled.
 - **Affordability:** income and external debt are self-declared; this is not bureau verification or a substitute for underwriting.
 - **Penalties:** product late charges/grace periods are configuration inputs. Confirm legal basis, disclosures, accounting, caps, and collection allocation policy before use.

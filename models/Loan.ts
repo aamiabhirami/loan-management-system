@@ -46,7 +46,7 @@ export interface ILoan extends Document {
   status: LoanStatus;
   creditCheck?: mongoose.Types.ObjectId;
   schedule: IInstallment[];
-  disbursementMode?: "SANDBOX" | "LIVE";
+  disbursementMode?: "SANDBOX" | "LIVE" | "MANUAL_CONFIRMED";
   disbursedAt?: Date;
   approvedBy?: mongoose.Types.ObjectId;
   approvedAt?: Date;
@@ -97,7 +97,7 @@ const LoanSchema = new Schema<ILoan>({
   },
   creditCheck: { type: Schema.Types.ObjectId, ref: "CreditCheck", default: null },
   schedule: { type: [InstallmentSchema], default: [] },
-  disbursementMode: { type: String, enum: ["SANDBOX", "LIVE"] },
+  disbursementMode: { type: String, enum: ["SANDBOX", "LIVE", "MANUAL_CONFIRMED"] },
   disbursedAt: Date,
   approvedBy: { type: Schema.Types.ObjectId, ref: "User" },
   approvedAt: Date,

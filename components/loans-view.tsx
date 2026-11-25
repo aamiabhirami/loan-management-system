@@ -100,6 +100,14 @@ export default function LoansView({ actorId, role }: { actorId: string; role: Us
         if (!reason?.trim()) return;
         await send(`/api/loans/${loan._id}`, "PATCH", { action: actionName, reason: reason.trim() });
         setMessage("Application approved without a credit bureau check. The override reason was recorded.");
+      } else if (actionName === "disburse" && data?.isProduction) {
+        const confirmed = window.confirm("Confirm that the loan funds have already been transferred outside this application. This action records the loan as active but will not move money.");
+        if (!confirmed) return;
+        const result = await send(`/api/loans/${loan._id}`, "PATCH", {
+          action: actionName,
+          confirmManualDisbursement: true,
+        });
+        setMessage(String(result.message));
       } else {
         const result = await send(`/api/loans/${loan._id}`, "PATCH", { action: actionName });
         setMessage(actionName === "disburse" ? String(result.message) : "Application approved.");
@@ -226,7 +234,7 @@ export default function LoansView({ actorId, role }: { actorId: string; role: Us
         )}
         <div className="flex items-start gap-2 border-t border-[#edf1ee] bg-[#fafbf9] px-5 py-3 text-[11px] leading-5 text-[#87958e]">
           <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#a48c55]" />
-          Bureau checks and disbursements are sandbox-only until live provider agreements and credentials are configured. Sandbox results must not be used for real lending decisions.
+          Sandbox disbursements do not transfer funds. In production, an administrator must confirm that funds were transferred manually; the application does not initiate a transfer.
         </div>
       </section>
     </div>
@@ -274,7 +282,7 @@ function LoanActions({
       {!isOrganizationAdmin(role) && loan.status === "PENDING_APPROVAL" && <p className="basis-full text-[11px] leading-4 text-[#87958e]">An organization administrator makes the approval decision.</p>}
       {isOrganizationAdmin(role) && loan.status === "APPROVED" && (
         isProduction
-          ? <span className="text-[11px] leading-4 text-[#986b29]">Live disbursement is not configured in production.</span>
+          ? <button className="inline-flex min-h-10 items-center gap-1 rounded-md bg-[#173b33] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#245548] disabled:opacity-50" disabled={working} onClick={() => onAction(loan, "disburse")} title="Confirm that funds were transferred outside this application." type="button"><ArrowDownToLine className="h-3.5 w-3.5" />Confirm disbursement</button>
           : <button className="inline-flex min-h-10 items-center gap-1 rounded-md bg-[#173b33] px-2.5 py-1.5 text-[11px] font-semibold text-white hover:bg-[#245548] disabled:opacity-50" disabled={working} onClick={() => onAction(loan, "disburse")} type="button"><ArrowDownToLine className="h-3.5 w-3.5" />Disburse</button>
       )}
       {working && <LoaderCircle className="h-5 w-5 animate-spin self-center text-[#769280]" />}

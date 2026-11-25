@@ -55,15 +55,17 @@ export async function PATCH(request: Request, { params }: RouteContext) {
       stringField(value.reason, "Rejection reason", 500);
     } else {
       if (loan.status !== "APPROVED") return jsonError("Only approved loans can be disbursed.", 409);
-      if (process.env.NODE_ENV === "production") {
-        return jsonError("Live disbursement is not configured. Sandbox disbursements are disabled in production.", 503);
+      if (process.env.NODE_ENV === "production" && value.confirmManualDisbursement !== true) {
+        return jsonError("Confirm that the funds were transferred manually before activating this loan.");
       }
       product = await LoanProduct.findById(loan.product);
       if (!product) return jsonError("The loan product is unavailable.", 409);
-      disbursement = await initiateDisbursement({
-        loanId: loan._id.toString(),
-        amountPaise: loan.principalPaise,
-      });
+      if (process.env.NODE_ENV !== "production") {
+        disbursement = await initiateDisbursement({
+          loanId: loan._id.toString(),
+          amountPaise: loan.principalPaise,
+        });
+      }
     }
 
     const session = await mongoose.startSession();
@@ -83,7 +85,8 @@ export async function PATCH(request: Request, { params }: RouteContext) {
           freshLoan.status = "REJECTED";
           freshLoan.rejectionReason = stringField(value.reason, "Rejection reason", 500);
         } else {
-          if (freshLoan.status !== "APPROVED" || !product || !disbursement) {
+          const manualConfirmation = process.env.NODE_ENV === "production";
+          if (freshLoan.status !== "APPROVED" || !product || (!disbursement && !manualConfirmation)) {
             throw new TypeError("Loan status changed; refresh and retry.");
           }
           const schedule = generateAmortizationSchedule({
@@ -98,7 +101,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
           });
           freshLoan.schedule = schedule.schedule;
           freshLoan.status = "ACTIVE";
-          freshLoan.disbursementMode = disbursement.mode;
+          freshLoan.disbursementMode = disbursement?.mode ?? "MANUAL_CONFIRMED";
           freshLoan.disbursedAt = new Date();
         }
 
@@ -108,7 +111,7 @@ export async function PATCH(request: Request, { params }: RouteContext) {
           actorId: actor.id,
           action: action === "approve_without_credit_check"
             ? "LOAN_APPROVE_WITHOUT_CREDIT_CHECK"
-            : `LOAN_${action.toUpperCase()}${disbursement ? "_SANDBOX" : ""}`,
+            : `LOAN_${action.toUpperCase()}${disbursement ? "_SANDBOX" : process.env.NODE_ENV === "production" ? "_MANUAL_CONFIRMED" : ""}`,
           targetEntity: "Loan",
           entityId: freshLoan._id.toString(),
           metadata: {
@@ -129,6 +132,9 @@ export async function PATCH(request: Request, { params }: RouteContext) {
         disbursementMode: disbursement.mode,
         reference: disbursement.reference,
         message: "Sandbox disbursement recorded; no funds were transferred.",
+      } : action === "disburse" ? {
+        disbursementMode: "MANUAL_CONFIRMED",
+        message: "Manual disbursement confirmed; no transfer was initiated by the application.",
       } : {}),
     });
   } catch (caught) {
