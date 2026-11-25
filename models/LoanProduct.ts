@@ -7,6 +7,7 @@ export interface ILoanProduct extends Document {
   description?: string;
   minPrincipalPaise: number;
   maxPrincipalPaise: number;
+  processingFeePaise: number;
   minTenureMonths: number;
   maxTenureMonths: number;
   annualInterestRatePercent: number;
@@ -30,6 +31,7 @@ const LoanProductSchema = new Schema<ILoanProduct>({
   description: { type: String, trim: true, maxlength: 500 },
   minPrincipalPaise: { type: Number, required: true, min: 1 },
   maxPrincipalPaise: { type: Number, required: true, min: 1 },
+  processingFeePaise: { type: Number, required: true, min: 0, default: 0 },
   minTenureMonths: { type: Number, required: true, min: 1, max: 120 },
   maxTenureMonths: { type: Number, required: true, min: 1, max: 120 },
   annualInterestRatePercent: { type: Number, required: true, min: 0, max: 100 },

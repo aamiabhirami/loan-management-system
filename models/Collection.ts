@@ -6,6 +6,7 @@ export interface ICollection extends Document {
   collectedBy: mongoose.Types.ObjectId;
   idempotencyKey: string;
   receiptCode: string;
+  collectionType: "INSTALLMENT" | "PROCESSING_FEE";
   amountPaise: number;
   channel: "CASH" | "UPI" | "BANK_TRANSFER";
   reference?: string;
@@ -34,6 +35,7 @@ const CollectionSchema = new Schema<ICollection>({
   collectedBy: { type: Schema.Types.ObjectId, ref: "User", required: true, immutable: true },
   idempotencyKey: { type: String, required: true, immutable: true },
   receiptCode: { type: String, required: true, unique: true, immutable: true },
+  collectionType: { type: String, enum: ["INSTALLMENT", "PROCESSING_FEE"], required: true, default: "INSTALLMENT", immutable: true },
   amountPaise: { type: Number, required: true, min: 1, immutable: true },
   channel: { type: String, enum: ["CASH", "UPI", "BANK_TRANSFER"], required: true, immutable: true },
   reference: { type: String, trim: true, maxlength: 80, immutable: true },

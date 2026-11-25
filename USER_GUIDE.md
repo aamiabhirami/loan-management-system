@@ -68,6 +68,7 @@ Open **Loan products**, choose **New product**, and enter:
 - Annual interest rate and day-count basis (Actual/365 or Actual/360).
 - Repayment cadence: weekly, fortnightly, or monthly. Weekly products require a payment weekday; monthly products require a day of the month (dates beyond a month's length fall on that month's last day).
 - Maximum debt-to-income percentage for the affordability check.
+- Optional one-time processing fee in rupees. The fee is copied to each new loan and collected separately after the loan becomes active.
 - Grace days, fixed late charge, annual penalty rate, and optional penalty cap.
 
 Review every value against the organization's approved lending policy, disclosures, and compliance guidance before making the product active. Product settings apply to new applications. An administrator can edit a product only until its first loan application is created; after that, the product terms are locked to preserve the terms used by that application. Deactivating a product prevents it from being selected for new applications and does not erase existing loans.
@@ -138,9 +139,9 @@ The affordability calculation also includes estimated payments on this organizat
 
 ### 5.4 Record a field collection
 
-In **Collections**, choose an active loan account with a due installment. Enter the amount actually received, select **Cash**, **UPI**, or **Bank transfer**, and optionally enter the external payment reference. Select **Record collection** once, then verify the success message and receipt code.
+In **Collections**, choose **Repayment installment** or **Processing fee**. Installment collections require an active loan with a due installment; processing-fee collections are available for active loans with an unpaid product fee and collect the full remaining fee as a separate payment. Select **Cash**, **UPI**, or **Bank transfer**, optionally enter the external payment reference, then verify the success message and receipt code.
 
-Mitra applies the collection to due installments in date order and records the allocation. Open the receipt link to check the borrower, amount, date/time, channel, reference, and principal/interest/penalty allocation; use **Print receipt** to print or save a print-to-PDF copy. If no due installment is available, the collection form is disabled. Do not use the receipt as proof of bank settlement.
+Mitra applies installment collections to due installments in date order and records the allocation. A processing-fee payment is recorded separately against the loan and does not change the repayment schedule. Open the receipt link to check the borrower, amount, date/time, channel, reference, collection type, and (for installments) principal/interest/penalty allocation; use **Print receipt** to print or save a print-to-PDF copy. Do not use the receipt as proof of bank settlement.
 
 ### 5.5 Review your portfolio
 

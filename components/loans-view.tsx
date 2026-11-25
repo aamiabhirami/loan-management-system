@@ -16,6 +16,7 @@ import { useResource } from "@/components/use-resource";
 import { generateAmortizationSchedule, type DayCountBasis, type RepaymentFrequency } from "@/lib/finance";
 import InlineMessage from "@/components/inline-message";
 import { getLoanApprovalBlocker, installmentCount } from "@/lib/loan-workflow";
+import { outstandingProcessingFeePaise } from "@/lib/processing-fee";
 import { isOrganizationAdmin, type UserRole } from "@/lib/roles";
 
 type Product = {
@@ -24,6 +25,7 @@ type Product = {
   code: string;
   minPrincipalPaise: number;
   maxPrincipalPaise: number;
+  processingFeePaise?: number;
   minTenureMonths: number;
   maxTenureMonths: number;
   frequency: RepaymentFrequency;
@@ -38,6 +40,8 @@ type Loan = {
   borrower: Customer;
   product: { name: string; code: string };
   principalPaise: number;
+  processingFeePaise?: number;
+  processingFeePaidPaise?: number;
   tenureMonths: number;
   frequency: string;
   annualInterestRatePercent: number;
@@ -53,6 +57,10 @@ type LoanActionName = "approve" | "approve_without_credit_check" | "reject" | "d
 
 function rupees(paise: number) {
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(paise / 100);
+}
+
+function preciseRupees(paise: number) {
+  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 2 }).format(paise / 100);
 }
 
 function date(value: string) {
@@ -167,7 +175,7 @@ export default function LoansView({ actorId, role }: { actorId: string; role: Us
                     }`}>{loan.status.replaceAll("_", " ").toLowerCase()}</span>
                   </div>
                   <dl className="grid grid-cols-2 gap-x-3 gap-y-3 border-t border-[#f0f3f0] pt-3 text-xs">
-                    <div><dt className="text-[#91a098]">Principal</dt><dd className="mt-1 font-semibold text-[#315444]">{rupees(loan.principalPaise)}</dd></div>
+                    <div><dt className="text-[#91a098]">Principal</dt><dd className="mt-1 font-semibold text-[#315444]">{rupees(loan.principalPaise)}</dd>{(loan.processingFeePaise ?? 0) > 0 && <dd className="mt-1 text-[10px] text-[#73857b]">Fee balance {preciseRupees(outstandingProcessingFeePaise(loan.processingFeePaise, loan.processingFeePaidPaise))} of {preciseRupees(loan.processingFeePaise ?? 0)}</dd>}</div>
                     <div><dt className="text-[#91a098]">Term / cadence</dt><dd className="mt-1 text-[#6f8179]">{loan.tenureMonths} months · {loan.frequency.toLowerCase()}</dd></div>
                     <div className="col-span-2"><dt className="text-[#91a098]">Next installment</dt><dd className="mt-1 text-[#6f8179]">{next ? `${date(next.dueDate)} · ${rupees(next.totalDuePaise)}` : loan.status === "PENDING_APPROVAL" ? `Est. ${rupees(loan.estimatedMonthlyInstallmentPaise)}/mo` : loan.status === "ACTIVE" ? "Schedule pending" : "—"}</dd></div>
                     <div className="col-span-2"><dt className="text-[#91a098]">Affordability</dt><dd className={`mt-1 font-medium ${loan.affordabilityPassed ? "text-[#56815f]" : "text-[#a36e31]"}`}>{loan.debtToIncomePercent.toFixed(1)}% debt-to-income · {loan.affordabilityPassed ? "within product limit" : "above product limit"}</dd></div>
@@ -207,7 +215,7 @@ export default function LoansView({ actorId, role }: { actorId: string; role: Us
                         <p className="text-xs font-medium text-[#49685b]">{loan.product?.name ?? "Loan product"}</p>
                         <p className="mt-1 text-[10px] text-[#92a098]">{loan.annualInterestRatePercent}% p.a.</p>
                       </td>
-                      <td className="px-5 py-4 text-sm font-semibold text-[#315444]">{rupees(loan.principalPaise)}</td>
+                      <td className="px-5 py-4 text-sm font-semibold text-[#315444]">{rupees(loan.principalPaise)}{(loan.processingFeePaise ?? 0) > 0 && <p className="mt-1 text-[10px] font-normal text-[#73857b]">Fee balance {preciseRupees(outstandingProcessingFeePaise(loan.processingFeePaise, loan.processingFeePaidPaise))} of {preciseRupees(loan.processingFeePaise ?? 0)}</p>}</td>
                       <td className="px-5 py-4 text-xs text-[#6f8179]">{loan.tenureMonths} months <span className="text-[#a0aaa5]">·</span> {loan.frequency.toLowerCase()}</td>
                       <td className="px-5 py-4">
                         <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${
@@ -376,7 +384,7 @@ function LoanApplicationForm({ role, onCreated }: { role: UserRole; onCreated: (
           <label className="text-xs font-semibold text-[#526d61]">Loan product
             <select className="form-control" name="productId" onChange={(event) => setProductId(event.target.value)} required value={productId}>
               <option value="">Select product</option>
-              {(productsData?.products ?? []).map((product) => <option key={product._id} value={product._id}>{product.name} · {product.annualInterestRatePercent}%</option>)}
+              {(productsData?.products ?? []).map((product) => <option key={product._id} value={product._id}>{product.name} · {product.annualInterestRatePercent}%{(product.processingFeePaise ?? 0) > 0 ? ` · fee ${preciseRupees(product.processingFeePaise ?? 0)}` : ""}</option>)}
             </select>
           </label>
           <label className="text-xs font-semibold text-[#526d61]">Principal (₹)
@@ -413,6 +421,7 @@ function LoanApplicationForm({ role, onCreated }: { role: UserRole; onCreated: (
           {error && <div className="sm:col-span-2 xl:col-span-5"><InlineMessage message={error} /></div>}
           {!productsData?.products.length && <p className="sm:col-span-2 xl:col-span-5 text-xs text-[#a07d39]">An administrator must configure an active loan product before applications can be created.</p>}
           <p className="sm:col-span-2 xl:col-span-5 text-[11px] text-[#85938c]">Affordability uses self-declared household income and external debt plus estimated payments on this organization’s active loans. Verify these figures through approved bureau and onboarding workflows before any real lending decision.</p>
+          {selectedProduct && (selectedProduct.processingFeePaise ?? 0) > 0 && <p className="sm:col-span-2 xl:col-span-5 text-[11px] text-[#85938c]">One-time processing fee: {preciseRupees(selectedProduct.processingFeePaise ?? 0)}. It is collected separately after the loan is active.</p>}
         </form>
       )}
     </section>

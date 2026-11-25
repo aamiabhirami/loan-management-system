@@ -41,6 +41,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
           metadata: {
             code: product.code,
             frequency: product.frequency,
+            processingFeePaise: product.processingFeePaise,
             ...(product.paymentWeekday !== undefined ? { paymentWeekday: product.paymentWeekday } : {}),
             ...(product.paymentMonthDate !== undefined ? { paymentMonthDate: product.paymentMonthDate } : {}),
           },

@@ -10,6 +10,9 @@ export function parseLoanProductInput(value: Record<string, unknown>) {
   const minPrincipalPaise = Math.round(numberField(value.minPrincipalRupees, "Minimum principal", 1, 100_000_000) * 100);
   const maxPrincipalPaise = Math.round(numberField(value.maxPrincipalRupees, "Maximum principal", 1, 100_000_000) * 100);
   if (maxPrincipalPaise < minPrincipalPaise) throw new TypeError("Maximum principal must be at least the minimum.");
+  const processingFeePaise = value.processingFeeRupees === undefined
+    ? 0
+    : Math.round(numberField(value.processingFeeRupees, "Processing fee", 0, 1_000_000) * 100);
   const minTenureMonths = numberField(value.minTenureMonths, "Minimum tenure", 1, 120);
   const maxTenureMonths = numberField(value.maxTenureMonths, "Maximum tenure", 1, 120);
   if (!Number.isInteger(minTenureMonths) || !Number.isInteger(maxTenureMonths) || maxTenureMonths < minTenureMonths) {
@@ -56,6 +59,7 @@ export function parseLoanProductInput(value: Record<string, unknown>) {
     description,
     minPrincipalPaise,
     maxPrincipalPaise,
+    processingFeePaise,
     minTenureMonths,
     maxTenureMonths,
     annualInterestRatePercent,

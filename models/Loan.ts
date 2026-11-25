@@ -31,6 +31,8 @@ export interface ILoan extends Document {
   requestedBy: mongoose.Types.ObjectId;
   assignedOfficer?: mongoose.Types.ObjectId;
   principalPaise: number;
+  processingFeePaise: number;
+  processingFeePaidPaise: number;
   annualInterestRatePercent: number;
   householdMonthlyIncomePaise: number;
   existingMonthlyDebtPaise: number;
@@ -77,6 +79,8 @@ const LoanSchema = new Schema<ILoan>({
   requestedBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
   assignedOfficer: { type: Schema.Types.ObjectId, ref: "User", default: null, index: true },
   principalPaise: { type: Number, required: true, min: 1 },
+  processingFeePaise: { type: Number, required: true, min: 0, default: 0 },
+  processingFeePaidPaise: { type: Number, required: true, min: 0, default: 0 },
   annualInterestRatePercent: { type: Number, required: true, min: 0, max: 100 },
   householdMonthlyIncomePaise: { type: Number, required: true, min: 1 },
   existingMonthlyDebtPaise: { type: Number, required: true, min: 0 },

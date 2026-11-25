@@ -125,6 +125,8 @@ export async function POST(request: Request) {
           requestedBy: actor.id,
           assignedOfficer: actor.role === "privileged" ? actor.id : undefined,
           principalPaise,
+          processingFeePaise: product.processingFeePaise ?? 0,
+          processingFeePaidPaise: 0,
           annualInterestRatePercent: product.annualInterestRatePercent,
           householdMonthlyIncomePaise,
           existingMonthlyDebtPaise,
@@ -148,6 +150,7 @@ export async function POST(request: Request) {
           entityId: loanId,
           metadata: {
             principalPaise,
+            processingFeePaise: product.processingFeePaise ?? 0,
             productCode: product.code,
             debtToIncomePercent: affordability.percent,
             affordabilityPassed: affordability.passed,

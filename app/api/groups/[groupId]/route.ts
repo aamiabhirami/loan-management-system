@@ -7,6 +7,7 @@ import { isOrganizationAdmin, type UserRole } from "@/lib/roles";
 import Group from "@/models/Group";
 import Loan from "@/models/Loan";
 import User from "@/models/User";
+import "@/models/LoanProduct";
 
 type RouteContext = { params: Promise<{ groupId: string }> };
 

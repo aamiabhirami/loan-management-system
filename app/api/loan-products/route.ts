@@ -55,6 +55,7 @@ export async function POST(request: Request) {
           metadata: {
             code: productInput.code,
             frequency: productInput.frequency,
+            processingFeePaise: productInput.processingFeePaise,
             ...(productInput.paymentWeekday !== undefined ? { paymentWeekday: productInput.paymentWeekday } : {}),
             ...(productInput.paymentMonthDate !== undefined ? { paymentMonthDate: productInput.paymentMonthDate } : {}),
           },
